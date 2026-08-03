@@ -1,0 +1,2109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Combiner</title>
+<meta name="theme-color" content="#8B1E3F">
+<meta name="description" content="Combine, reorder, sign, and view PDFs — entirely in your browser.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
+<style>
+  :root {
+    --paper: #FAF9F6;
+    --ink: #1C1B1A;
+    --maroon: #8B1E3F;
+    --maroon-dark: #6E1832;
+    --muted: #6E6A64;
+    --line: #E4E0D8;
+    --card: #FFFFFF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 40px 20px 80px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  header { margin-bottom: 24px; }
+  .eyebrow {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-size: 13px;
+    color: var(--maroon);
+    margin-bottom: 6px;
+  }
+  h1 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 44px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+  .sub { color: var(--muted); font-size: 14px; margin-top: 10px; max-width: 56ch; }
+
+  .tabs {
+    display: inline-flex;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    background: var(--card);
+  }
+  .tab {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 10px 22px;
+    border: none;
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .tab.active { background: var(--maroon); color: #fff; }
+  .tab:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+  .tab-hint { font-size: 12px; color: var(--muted); margin: -12px 0 20px 2px; }
+
+  .dropzone {
+    border: 2px dashed var(--line);
+    border-radius: 10px;
+    background: var(--card);
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    margin-bottom: 24px;
+  }
+  .dropzone:hover, .dropzone.drag-over { border-color: var(--maroon); background: #FDF7F8; }
+  .dropzone:focus-visible { outline: 3px solid var(--maroon); outline-offset: 2px; }
+  .dz-title { font-weight: 600; font-size: 15px; }
+  .dz-hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  input[type=file] { display: none; }
+
+  .lineup-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+  }
+  .lineup-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 20px;
+    letter-spacing: 0.04em;
+  }
+  .lineup-count { font-size: 13px; color: var(--muted); }
+
+  #fileList, #convertList { list-style: none; }
+  .file-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-top: 10px;
+    transition: box-shadow .15s, opacity .15s;
+  }
+  .file-row[draggable=true] { cursor: grab; }
+  .file-row[draggable=true]:active { cursor: grabbing; }
+  .file-row.dragging { opacity: 0.4; }
+  .file-row.drop-target { box-shadow: 0 0 0 2px var(--maroon); }
+  .order-badge {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    color: #fff;
+    width: 40px; height: 40px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .type-badge {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.05em;
+    color: var(--maroon);
+    border: 2px solid var(--maroon);
+    width: 46px; height: 40px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    text-transform: uppercase;
+  }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .row-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
+  .icon-btn {
+    background: none;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    width: 32px; height: 32px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    transition: background .12s, border-color .12s;
+  }
+  .icon-btn:hover { background: var(--paper); border-color: var(--muted); }
+  .icon-btn:disabled { opacity: 0.3; cursor: default; }
+  .icon-btn:focus-visible { outline: 2px solid var(--maroon); outline-offset: 1px; }
+  .icon-btn.remove:hover { border-color: var(--maroon); color: var(--maroon); }
+  .small-btn {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    background: none;
+    border: 1px solid var(--ink);
+    border-radius: 6px;
+    padding: 7px 14px;
+    cursor: pointer;
+    color: var(--ink);
+    transition: background .12s, color .12s;
+  }
+  .small-btn:hover { background: var(--ink); color: #fff; }
+  .small-btn:focus-visible { outline: 2px solid var(--maroon); outline-offset: 1px; }
+
+  .empty-state { text-align: center; color: var(--muted); font-size: 14px; padding: 28px 0; }
+
+  .drag-handle {
+    touch-action: none;
+    cursor: grab;
+    color: var(--muted);
+    font-size: 17px;
+    width: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .pg-handle {
+    position: absolute;
+    top: 12px; right: 12px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    width: 30px; height: 24px;
+    font-size: 14px;
+    z-index: 2;
+  }
+
+  #pageGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+    list-style: none;
+  }
+  .page-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
+    cursor: grab;
+    transition: box-shadow .15s, opacity .15s;
+    position: relative;
+  }
+  .page-card:active { cursor: grabbing; }
+  .page-card.dragging { opacity: 0.35; }
+  .page-card.drop-target { box-shadow: 0 0 0 2px var(--maroon); }
+  .page-card.drop-target::before {
+    content: '';
+    position: absolute;
+    left: -8px; top: 8px; bottom: 8px;
+    width: 3px;
+    background: var(--maroon);
+    border-radius: 2px;
+  }
+  .thumb-box {
+    width: 100%;
+    aspect-ratio: 8.5 / 11;
+    background: #F1EEE8;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  .thumb-box img { width: 100%; height: 100%; object-fit: contain; }
+  .thumb-loading { font-size: 11px; color: var(--muted); }
+  .pg-num {
+    position: absolute;
+    top: 12px; left: 12px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    color: #fff;
+    background: var(--ink);
+    border-radius: 4px;
+    padding: 1px 7px;
+  }
+  .pg-src { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+  .src-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .pg-src-name { overflow: hidden; text-overflow: ellipsis; }
+  .pg-actions { display: flex; gap: 4px; margin-top: 6px; }
+  .pg-actions .icon-btn { width: 100%; height: 26px; font-size: 11px; }
+
+  .output-bar { margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .name-field {
+    flex: 1; min-width: 200px;
+    display: flex; align-items: center;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0 12px;
+  }
+  .name-field input {
+    display: block;
+    border: none; outline: none; background: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    padding: 12px 4px 12px 0;
+    width: 100%;
+    color: var(--ink);
+  }
+  .name-field span { color: var(--muted); font-size: 14px; }
+  .name-field:focus-within { border-color: var(--maroon); }
+  .merge-btn {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: var(--maroon);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 28px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .merge-btn:hover { background: var(--maroon-dark); }
+  .merge-btn:disabled { background: var(--line); color: var(--muted); cursor: default; }
+  .merge-btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  .ready-panel {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: #F3F8F3;
+    border: 1px solid #BFD8C0;
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .ready-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 17px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #2E6B34;
+  }
+  .ready-name { font-size: 13px; color: var(--muted); margin-top: 2px; word-break: break-all; }
+  .ready-actions { display: flex; gap: 8px; align-items: center; }
+  @media (max-width: 560px) {
+    .ready-panel { flex-direction: column; align-items: stretch; }
+    .ready-actions { width: 100%; }
+    .ready-actions .merge-btn { flex: 1; }
+  }
+  .status { margin-top: 14px; font-size: 13px; min-height: 18px; }
+  .status.ok { color: #2E6B34; }
+  .status.err { color: var(--maroon); }
+
+  /* Signature builder */
+  .sign-mode-tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+  .sign-mode { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; padding: 8px 20px; border: none; background: var(--card); color: var(--muted); cursor: pointer; }
+  .sign-mode.active { background: var(--ink); color: #fff; }
+  #sigCanvas { width: 100%; max-width: 100%; height: 200px; border: 2px dashed var(--line); border-radius: 10px; background: var(--card); touch-action: none; cursor: crosshair; display: block; }
+  #sigTypeInput { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 14px; font-size: 20px; outline: none; }
+  #sigTypeInput:focus { border-color: var(--maroon); }
+  .sign-type-fonts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-top: 12px; }
+  .sig-font-opt { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; cursor: pointer; font-size: 26px; line-height: 1.1; color: var(--ink); background: var(--card); text-align: center; overflow: hidden; white-space: nowrap; }
+  .sig-font-opt.selected { border-color: var(--maroon); box-shadow: 0 0 0 1px var(--maroon); }
+  .sign-actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+  .sign-hint { font-size: 12px; color: var(--muted); }
+  .sign-save-row { display: flex; align-items: center; gap: 14px; margin-top: 18px; }
+
+  /* Placement overlay */
+  #placeOverlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+  .place-backdrop { position: absolute; inset: 0; background: rgba(20,18,16,0.55); }
+  .place-modal { position: relative; background: var(--paper); border-radius: 12px; max-width: 90vw; max-height: 92vh; padding: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.35); display: flex; flex-direction: column; }
+  .place-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .place-title { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; font-size: 20px; }
+  .place-stage { position: relative; line-height: 0; overflow: hidden; border: 1px solid var(--line); background: #fff; }
+  .place-stage img#placePageImg { max-width: 78vw; max-height: 66vh; width: auto; height: auto; display: block; }
+  #sigBox { position: absolute; left: 20px; top: 20px; width: 180px; height: 70px; border: 1px dashed var(--maroon); cursor: move; touch-action: none; }
+  #sigBox img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+  .sig-handle { position: absolute; right: -7px; bottom: -7px; width: 16px; height: 16px; background: var(--maroon); border: 2px solid #fff; border-radius: 3px; cursor: nwse-resize; }
+  .place-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+
+  /* View / preview strip */
+  #viewPane { margin-top: 8px; }
+  .view-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+  .view-status { font-size: 13px; color: var(--muted); }
+  .view-strip { display: flex; flex-direction: column; align-items: center; gap: 18px; }
+  .view-page { position: relative; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.12); border: 1px solid var(--line); max-width: 100%; }
+  .view-page img { display: block; width: 100%; height: auto; }
+  .view-page .view-pnum { position: absolute; top: 8px; left: 8px; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 13px; color: #fff; background: var(--ink); border-radius: 4px; padding: 1px 8px; opacity: 0.85; }
+  .view-loading { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 8.5/11; max-width: 620px; background: #F1EEE8; border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+  /* Bigger touch targets on touch devices */
+  @media (pointer: coarse) {
+    .icon-btn { width: 42px; height: 42px; font-size: 15px; }
+    .pg-actions .icon-btn { height: 36px; }
+    .small-btn { padding: 11px 16px; }
+    .drag-handle { width: 34px; font-size: 20px; }
+    .pg-handle { width: 36px; height: 30px; font-size: 17px; }
+  }
+
+  @media (max-width: 560px) {
+    body { padding: 24px 12px 64px; }
+    h1 { font-size: 34px; }
+    .tabs { display: flex; width: 100%; }
+    .tab { flex: 1; padding: 13px 0; font-size: 15px; }
+    .file-row { flex-wrap: wrap; gap: 10px; padding: 12px; }
+    .file-row .file-info { flex: 1 1 calc(100% - 110px); }
+    .file-row .row-actions { width: 100%; justify-content: flex-end; }
+    .output-bar { flex-direction: column; }
+    .merge-btn { width: 100%; padding: 15px; }
+    #pageGrid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Convert &middot; Combine &middot; Order</div>
+    <h1>PDF Combiner</h1>
+    <p class="sub">Turn files into PDFs, put them in order, and merge them into one document. Everything runs in your browser &mdash; nothing gets uploaded anywhere.</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" id="tabFiles" role="tab" aria-selected="true">Files</button>
+    <button class="tab" id="tabPages" role="tab" aria-selected="false">Pages</button>
+    <button class="tab" id="tabFont" role="tab" aria-selected="false">Font</button>
+    <button class="tab" id="tabSign" role="tab" aria-selected="false">Sign</button>
+    <button class="tab" id="tabView" role="tab" aria-selected="false">View</button>
+    <button class="tab" id="tabConvert" role="tab" aria-selected="false">Convert</button>
+  </div>
+  <div class="tab-hint" id="tabHint">Reorder whole documents &mdash; quick and simple.</div>
+
+  <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Add PDF files">
+    <div class="dz-title">Drop PDFs here or click to browse</div>
+    <div class="dz-hint">Add as many as you want &mdash; new files land at the end, then move them wherever</div>
+    <input type="file" id="fileInput" accept="application/pdf,.pdf" multiple>
+  </div>
+
+  <div class="dropzone" id="convertZone" tabindex="0" role="button" aria-label="Add files to convert" style="display:none;">
+    <div class="dz-title">Drop files to convert to PDF</div>
+    <div class="dz-hint">Images (JPG, PNG, WebP, GIF) &middot; Word docs (.docx) &middot; Text (.txt, .md) &middot; Web pages (.html)</div>
+    <input type="file" id="convertInput" accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.docx,.txt,.md,.html,.htm" multiple>
+  </div>
+
+  <div class="lineup-head">
+    <div class="lineup-title" id="lineupTitle">Merge Order</div>
+    <div class="lineup-count" id="countLabel">0 files</div>
+  </div>
+
+  <div id="fontControls" style="display:none;">
+    <div class="name-field" style="margin-bottom:18px;">
+      <select id="fontSelect" aria-label="Choose a font" style="width:100%;border:none;outline:none;background:none;font-family:'Inter',sans-serif;font-size:14px;padding:12px 4px 12px 0;color:var(--ink);">
+        <option value="Helvetica">Helvetica (instant)</option>
+        <option value="TimesRoman">Times New Roman (instant)</option>
+        <option value="Courier">Courier (instant)</option>
+        <option value="roboto">Roboto (small download)</option>
+        <option value="opensans">Open Sans (small download)</option>
+        <option value="montserrat">Montserrat (small download)</option>
+        <option value="lato">Lato (small download)</option>
+        <option value="inter">Inter (small download)</option>
+      </select>
+    </div>
+  </div>
+
+  <ul id="fileList"></ul>
+  <ul id="pageGrid" style="display:none;"></ul>
+  <ul id="convertList" style="display:none;"></ul>
+  <ul id="fontList" style="display:none;"></ul>
+
+  <div id="signControls" style="display:none;">
+    <div class="sign-mode-tabs">
+      <button class="sign-mode active" id="signDrawTab">Draw</button>
+      <button class="sign-mode" id="signTypeTab">Type</button>
+    </div>
+
+    <div id="signDrawPane">
+      <canvas id="sigCanvas" width="600" height="200" aria-label="Draw your signature"></canvas>
+      <div class="sign-actions">
+        <button class="small-btn" id="sigClear">Clear</button>
+        <span class="sign-hint">Draw your signature above with your mouse or trackpad.</span>
+      </div>
+    </div>
+
+    <div id="signTypePane" style="display:none;">
+      <input type="text" id="sigTypeInput" placeholder="Type your name" aria-label="Type your signature">
+      <div class="sign-type-fonts" id="sigFontPicker"></div>
+    </div>
+
+    <div class="sign-save-row">
+      <button class="merge-btn" id="sigSave" style="padding:11px 22px;font-size:16px;">Save signature</button>
+      <span class="sign-hint" id="sigSavedNote" style="display:none;">✓ Signature ready — pick a page below to place it.</span>
+    </div>
+  </div>
+
+  <ul id="signList" style="display:none;"></ul>
+
+  <div class="dropzone" id="openZone" tabindex="0" role="button" aria-label="Open a PDF to view" style="display:none;">
+    <div class="dz-title">Open any PDF just to view it</div>
+    <div class="dz-hint">This won't add it to your merge order &mdash; it's just for reading</div>
+    <input type="file" id="openInput" accept="application/pdf,.pdf">
+  </div>
+  <div id="viewPane" style="display:none;"></div>
+
+  <!-- Placement overlay -->
+  <div id="placeOverlay" style="display:none;">
+    <div class="place-backdrop"></div>
+    <div class="place-modal">
+      <div class="place-head">
+        <div class="place-title">Position your signature</div>
+        <button class="icon-btn" id="placeClose" aria-label="Cancel">✕</button>
+      </div>
+      <div class="place-stage" id="placeStage">
+        <img id="placePageImg" alt="Page preview">
+        <div id="sigBox"><img id="sigBoxImg" alt="Signature" draggable="false"><span class="sig-handle" id="sigHandle"></span></div>
+      </div>
+      <div class="place-foot">
+        <span class="sign-hint">Drag to move · drag the corner to resize · arrow keys nudge</span>
+        <button class="merge-btn" id="placeApply" style="padding:10px 22px;font-size:16px;">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="empty-state" id="emptyState">No files yet &mdash; add some PDFs above to get started.</div>
+
+  <div class="output-bar" id="outputBar">
+    <div class="name-field">
+      <input type="text" id="outName" value="" placeholder="combined" aria-label="Output file name">
+      <span>.pdf</span>
+    </div>
+    <button class="merge-btn" id="mergeBtn" disabled>Merge &amp; Download</button>
+  </div>
+  <div class="ready-panel" id="readyPanel" style="display:none;">
+    <div class="ready-info">
+      <div class="ready-title">Your PDF is ready</div>
+      <div class="ready-name" id="readyName"></div>
+    </div>
+    <div class="ready-actions">
+      <button class="merge-btn" id="saveBtn" style="padding:11px 20px;font-size:16px;">Save / Share</button>
+      <button class="small-btn" id="previewBtn">Preview</button>
+    </div>
+  </div>
+  <div class="status" id="status" role="status"></div>
+</div>
+
+<script>
+// Libraries load from the internet. If a load fails (flaky connection),
+// we retry automatically — including from a backup server — instead of
+// staying broken until refresh.
+let PDFDocument, StandardFonts, rgb;
+const LIB_URLS = {
+  PDFLib: [
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js',
+    'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js'
+  ],
+  pdfjsLib: [
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js'
+  ],
+  mammoth: [
+    'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js',
+    'https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js'
+  ],
+  fontkit: [
+    'https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js',
+    'https://cdn.jsdelivr.net/npm/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js'
+  ]
+};
+const libPromises = {};
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = res;
+    s.onerror = () => { s.remove(); rej(new Error('failed: ' + src)); };
+    document.head.appendChild(s);
+  });
+}
+async function requireLib(name) {
+  if (window[name]) return;
+  if (!libPromises[name]) {
+    libPromises[name] = (async () => {
+      for (const url of LIB_URLS[name]) {
+        try {
+          await loadScript(url);
+          if (window[name]) return;
+        } catch (e) { /* try next mirror */ }
+      }
+      throw new Error('Could not load the PDF engine — check your internet connection and try again.');
+    })().catch(err => { libPromises[name] = null; throw err; });
+  }
+  await libPromises[name];
+}
+async function ensureLibs() {
+  await requireLib('PDFLib');
+  if (!PDFDocument) ({ PDFDocument, StandardFonts, rgb } = window.PDFLib);
+}
+
+const SRC_COLORS = ['#8B1E3F','#1F5FA8','#2E6B34','#B0672A','#5B3E96','#0E7C7B','#A02828','#57641F'];
+
+let files = [];
+let pages = [];
+let converted = [];
+let nextFileId = 1, nextPageUid = 1;
+let mode = 'files';
+let dragFileId = null, dragPageUid = null;
+
+const $ = id => document.getElementById(id);
+const dropzone = $('dropzone'), fileInput = $('fileInput'),
+      convertZone = $('convertZone'), convertInput = $('convertInput'),
+      fileList = $('fileList'), pageGrid = $('pageGrid'), convertList = $('convertList'),
+      emptyState = $('emptyState'), countLabel = $('countLabel'),
+      mergeBtn = $('mergeBtn'), statusEl = $('status'), outName = $('outName'),
+      tabFiles = $('tabFiles'), tabPages = $('tabPages'), tabConvert = $('tabConvert'),
+      tabHint = $('tabHint'), lineupTitle = $('lineupTitle'), outputBar = $('outputBar'),
+      tabFont = $('tabFont'), fontControls = $('fontControls'), fontSelect = $('fontSelect'), fontList = $('fontList'),
+      readyPanel = $('readyPanel'), readyName = $('readyName'), saveBtn = $('saveBtn'), previewBtn = $('previewBtn');
+let lastOutput = null;
+
+const tabSign = $('tabSign'), signControls = $('signControls'), signList = $('signList'),
+      tabView = $('tabView'), viewPane = $('viewPane'),
+      openZone = $('openZone'), openInput = $('openInput'),
+      signDrawTab = $('signDrawTab'), signTypeTab = $('signTypeTab'),
+      signDrawPane = $('signDrawPane'), signTypePane = $('signTypePane'),
+      sigCanvas = $('sigCanvas'), sigClear = $('sigClear'), sigSave = $('sigSave'),
+      sigSavedNote = $('sigSavedNote'), sigTypeInput = $('sigTypeInput'), sigFontPicker = $('sigFontPicker'),
+      placeOverlay = $('placeOverlay'), placeStage = $('placeStage'), placePageImg = $('placePageImg'),
+      sigBox = $('sigBox'), sigBoxImg = $('sigBoxImg'), sigHandle = $('sigHandle'),
+      placeClose = $('placeClose'), placeApply = $('placeApply');
+let signatureDataUrl = null;   // trimmed PNG of the current signature
+let signMode = 'draw';
+let placeTarget = null;        // { fileId, srcIndex }
+let standaloneDoc = null;      // { name, bytes } — a PDF opened just to view, not part of merge lineup
+
+function setStatus(msg, kind) {
+  statusEl.textContent = msg || '';
+  statusEl.className = 'status' + (kind ? ' ' + kind : '');
+}
+function fmtSize(b) { return b < 1048576 ? (b/1024).toFixed(0)+' KB' : (b/1048576).toFixed(1)+' MB'; }
+function fileById(id) { return files.find(f => f.id === id); }
+function ext(name) { const m = name.toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1] : ''; }
+
+function dataUrlToBytes(dataUrl) {
+  const b64 = dataUrl.split(',')[1];
+  const bin = atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+
+/* ---------- Registering PDFs into the lineup ---------- */
+async function registerPdf(name, bytes, size, isConverted) {
+  await ensureLibs();
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const rec = {
+    id: nextFileId++, name, bytes,
+    pages: doc.getPageCount(), size,
+    color: SRC_COLORS[(nextFileId - 2) % SRC_COLORS.length],
+    converted: !!isConverted
+  };
+  files.push(rec);
+  for (let i = 0; i < rec.pages; i++) {
+    pages.push({ uid: nextPageUid++, fileId: rec.id, srcIndex: i, thumb: null });
+  }
+  return rec;
+}
+
+async function addFiles(fileArr) {
+  const pdfs = fileArr.filter(f => f.type === 'application/pdf' || ext(f.name) === 'pdf');
+  const skipped = fileArr.length - pdfs.length;
+  if (skipped > 0) setStatus(skipped + ' non-PDF file' + (skipped>1?'s':'') + ' skipped — use the Convert tab for those.', 'err');
+  for (const f of pdfs) {
+    try {
+      await registerPdf(f.name, await f.arrayBuffer(), f.size, false);
+    } catch (e) {
+      setStatus('Could not read "' + f.name + '" — it may be corrupted or password-protected.', 'err');
+    }
+  }
+  render();
+  renderThumbs();
+}
+
+/* ---------- Conversion ---------- */
+const IMG_EXTS = ['jpg','jpeg','png','webp','gif','bmp'];
+
+async function convertFiles(fileArr) {
+  for (const f of fileArr) {
+    const e = ext(f.name);
+    setStatus('Converting ' + f.name + '…');
+    try {
+      let bytes = null;
+      if (e === 'pdf') {
+        await registerPdf(f.name, await f.arrayBuffer(), f.size, false);
+        setStatus(f.name + ' is already a PDF — added straight to the merge order.', 'ok');
+        render(); renderThumbs();
+        continue;
+      } else if (IMG_EXTS.includes(e)) {
+        bytes = await imageToPdf(f);
+      } else if (e === 'docx') {
+        bytes = await docxToPdf(f);
+      } else if (e === 'txt' || e === 'md') {
+        bytes = await textToPdf(f);
+      } else if (e === 'html' || e === 'htm') {
+        bytes = await htmlFileToPdf(f);
+      } else {
+        setStatus('"' + f.name + '" is not a supported type. Supported: images, .docx, .txt, .md, .html', 'err');
+        continue;
+      }
+      const newName = f.name.replace(/\.[^.]+$/, '') + '.pdf';
+      const rec = await registerPdf(newName, bytes, bytes.byteLength, true);
+      converted.push({ id: rec.id, name: newName, origName: f.name, pages: rec.pages, size: bytes.byteLength });
+      setStatus('Converted ' + f.name + ' → ' + newName + ' and added it to the merge order.', 'ok');
+    } catch (err) {
+      console.error(err);
+      setStatus('Could not convert "' + f.name + '": ' + err.message, 'err');
+    }
+  }
+  render();
+  renderThumbs();
+}
+
+/* ---- Image → PDF ---- */
+async function imageToPdf(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = () => rej(new Error('could not read image'));
+      i.src = url;
+    });
+    const isPng = ext(file.name) === 'png';
+    const cv = document.createElement('canvas');
+    cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+    const ctx = cv.getContext('2d');
+    if (!isPng) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); }
+    ctx.drawImage(img, 0, 0);
+    const dataUrl = isPng ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', 0.92);
+    const imgBytes = dataUrlToBytes(dataUrl);
+
+    await ensureLibs();
+    const doc = await PDFDocument.create();
+    const embedded = isPng ? await doc.embedPng(imgBytes) : await doc.embedJpg(imgBytes);
+    const PW = 612, PH = 792, M = 36;
+    const scale = Math.min((PW - 2*M) / embedded.width, (PH - 2*M) / embedded.height, 1);
+    const w = embedded.width * scale, h = embedded.height * scale;
+    const page = doc.addPage([PW, PH]);
+    page.drawImage(embedded, { x: (PW - w)/2, y: (PH - h)/2, width: w, height: h });
+    return await doc.save();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/* ---- Shared text layout engine (pdf-lib) ---- */
+const PAGE = { W: 612, H: 792, M: 54 };
+
+function sanitizeForWinAnsi(s) {
+  return s
+    .replace(/[\u2018\u2019\u02BC]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\t/g, '    ')
+    .replace(/[\u2192\u27A1]/g, '->')
+    .replace(/[^\x20-\x7E\u00A1-\u00FF\u2022]/g, '');
+}
+
+function wrapText(text, font, size, maxW) {
+  const out = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const safe = sanitizeForWinAnsi(raw);
+    if (safe.trim() === '') { out.push(''); continue; }
+    let line = '';
+    for (const word of safe.split(/ +/)) {
+      const test = line ? line + ' ' + word : word;
+      if (font.widthOfTextAtSize(test, size) <= maxW) { line = test; }
+      else {
+        if (line) out.push(line);
+        let w = word;
+        while (font.widthOfTextAtSize(w, size) > maxW && w.length > 1) {
+          let cut = w.length;
+          while (cut > 1 && font.widthOfTextAtSize(w.slice(0, cut), size) > maxW) cut--;
+          out.push(w.slice(0, cut));
+          w = w.slice(cut);
+        }
+        line = w;
+      }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+// Builds a PDF from a list of blocks:
+// { type:'text', text, size, bold, indent, spaceAfter } | { type:'image', bytes, isPng }
+async function blocksToPdf(blocks) {
+  await ensureLibs();
+  const doc = await PDFDocument.create();
+  const fontReg = await doc.embedFont(StandardFonts.Helvetica);
+  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  let page = doc.addPage([PAGE.W, PAGE.H]);
+  let y = PAGE.H - PAGE.M;
+  let wrote = false;
+
+  const newPage = () => { page = doc.addPage([PAGE.W, PAGE.H]); y = PAGE.H - PAGE.M; };
+
+  for (const b of blocks) {
+    if (b.type === 'image') {
+      try {
+        const embedded = b.isPng ? await doc.embedPng(b.bytes) : await doc.embedJpg(b.bytes);
+        const maxW = PAGE.W - 2*PAGE.M;
+        const maxH = PAGE.H - 2*PAGE.M;
+        const scale = Math.min(maxW / embedded.width, maxH / embedded.height, 1);
+        const w = embedded.width * scale, h = embedded.height * scale;
+        if (y - h < PAGE.M) newPage();
+        page.drawImage(embedded, { x: PAGE.M, y: y - h, width: w, height: h });
+        y -= h + 12;
+        wrote = true;
+      } catch (e) { /* skip unembeddable image */ }
+      continue;
+    }
+    const font = b.bold ? fontBold : fontReg;
+    const size = b.size || 11;
+    const lh = size * 1.42;
+    const indent = b.indent || 0;
+    const maxW = PAGE.W - 2*PAGE.M - indent;
+    const lines = wrapText(b.text, font, size, maxW);
+    for (const l of lines) {
+      if (y - lh < PAGE.M) newPage();
+      if (l) {
+        page.drawText(l, { x: PAGE.M + indent, y: y - size, size, font, color: rgb(0.08,0.08,0.08) });
+        wrote = true;
+      }
+      y -= lh;
+    }
+    y -= (b.spaceAfter != null ? b.spaceAfter : size * 0.45);
+  }
+  if (!wrote) throw new Error('no readable content found');
+  return await doc.save();
+}
+
+/* ---- Plain text / markdown → PDF ---- */
+async function textToPdf(file) {
+  const text = await file.text();
+  if (!text.trim()) throw new Error('file is empty');
+  return await blocksToPdf([{ type: 'text', text, size: 11, spaceAfter: 0 }]);
+}
+
+/* ---- HTML → blocks (used for .docx via mammoth and for .html files) ---- */
+function htmlToBlocks(html) {
+  const dom = new DOMParser().parseFromString(html, 'text/html');
+  dom.querySelectorAll('script,style').forEach(n => n.remove());
+  const blocks = [];
+  const H_SIZES = { H1: 20, H2: 17, H3: 14.5, H4: 12.5, H5: 11.5, H6: 11 };
+
+  function textOf(node) {
+    return (node.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+  function pushImage(imgEl) {
+    const src = imgEl.getAttribute('src') || '';
+    if (!src.startsWith('data:image/')) return;
+    const isPng = src.startsWith('data:image/png');
+    const isJpg = src.startsWith('data:image/jpeg') || src.startsWith('data:image/jpg');
+    if (!isPng && !isJpg) return;
+    try { blocks.push({ type: 'image', bytes: dataUrlToBytes(src), isPng }); } catch (e) {}
+  }
+  function walkList(el, depth, ordered) {
+    let n = 0;
+    for (const child of el.children) {
+      if (child.tagName !== 'LI') continue;
+      n++;
+      // Direct text of the li (excluding nested lists)
+      const clone = child.cloneNode(true);
+      clone.querySelectorAll('ul,ol').forEach(x => x.remove());
+      clone.querySelectorAll('img').forEach(x => { pushImage(x); x.remove(); });
+      const t = textOf(clone);
+      if (t) {
+        const marker = ordered ? (n + '. ') : '\u2022 ';
+        blocks.push({ type: 'text', text: marker + t, size: 11, indent: 18 + depth * 18, spaceAfter: 2 });
+      }
+      for (const sub of child.children) {
+        if (sub.tagName === 'UL' || sub.tagName === 'OL') walkList(sub, depth + 1, sub.tagName === 'OL');
+      }
+    }
+  }
+  function walk(node) {
+    for (const el of node.children) {
+      const tag = el.tagName;
+      if (H_SIZES[tag]) {
+        el.querySelectorAll('img').forEach(pushImage);
+        const t = textOf(el);
+        if (t) blocks.push({ type: 'text', text: t, size: H_SIZES[tag], bold: true, spaceAfter: 6 });
+      } else if (tag === 'P' || tag === 'BLOCKQUOTE' || tag === 'PRE') {
+        el.querySelectorAll('img').forEach(pushImage);
+        const t = tag === 'PRE' ? el.textContent : textOf(el);
+        if (t && t.trim()) blocks.push({ type: 'text', text: t, size: 11, indent: tag === 'BLOCKQUOTE' ? 18 : 0, spaceAfter: 5 });
+        else if (el.querySelector('img')) { /* image-only paragraph, already pushed */ }
+      } else if (tag === 'UL' || tag === 'OL') {
+        walkList(el, 0, tag === 'OL');
+        blocks.push({ type: 'text', text: '', size: 4, spaceAfter: 2 });
+      } else if (tag === 'TABLE') {
+        for (const row of el.querySelectorAll('tr')) {
+          const cells = Array.from(row.querySelectorAll('td,th')).map(c => textOf(c));
+          const t = cells.filter(c => c !== '').join('  |  ');
+          if (t) blocks.push({ type: 'text', text: t, size: 10, bold: row.querySelector('th') != null, spaceAfter: 2 });
+        }
+        blocks.push({ type: 'text', text: '', size: 4, spaceAfter: 3 });
+      } else if (tag === 'IMG') {
+        pushImage(el);
+      } else if (tag === 'BR' || tag === 'HR') {
+        blocks.push({ type: 'text', text: '', size: 6, spaceAfter: 2 });
+      } else {
+        // container (div, section, span wrappers) — recurse
+        if (el.children.length) walk(el);
+        else {
+          const t = textOf(el);
+          if (t) blocks.push({ type: 'text', text: t, size: 11, spaceAfter: 5 });
+        }
+      }
+    }
+  }
+  walk(dom.body);
+  return blocks;
+}
+
+async function docxToPdf(file) {
+  await requireLib('mammoth');
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await mammoth.convertToHtml({ arrayBuffer }, {
+    convertImage: mammoth.images.imgElement(img =>
+      img.read('base64').then(b64 => ({ src: 'data:' + img.contentType + ';base64,' + b64 })))
+  });
+  const blocks = htmlToBlocks(result.value || '');
+  if (!blocks.length) throw new Error('document appears to be empty');
+  return await blocksToPdf(blocks);
+}
+
+async function htmlFileToPdf(file) {
+  const html = await file.text();
+  const blocks = htmlToBlocks(html);
+  if (!blocks.length) throw new Error('no readable content found');
+  return await blocksToPdf(blocks);
+}
+
+const isTouchDevice = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+
+async function downloadPdf(bytes, name) {
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  // On iPad/iPhone/Android the native share sheet is the reliable way to
+  // save a file ("Save to Files"); simulated download clicks are often ignored.
+  if (isTouchDevice && navigator.share && navigator.canShare) {
+    try {
+      const file = new File([blob], name, { type: 'application/pdf' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: name });
+        return true;
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') return true; // user closed the sheet — fine
+      // NotAllowedError etc. — fall through to other methods
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return true;
+}
+
+function openPreview(bytes, name) {
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const w = window.open(url, '_blank');
+  if (!w) setStatus('Your browser blocked the preview window — use Save / Share instead.', 'err');
+  setTimeout(() => URL.revokeObjectURL(url), 120000);
+}
+
+/* ---------- Font restyling ---------- */
+const FONT_DEFS = {
+  Helvetica:  { label: 'Helvetica',       std: { r:'Helvetica', b:'HelveticaBold', i:'HelveticaOblique', bi:'HelveticaBoldOblique' } },
+  TimesRoman: { label: 'Times New Roman', std: { r:'TimesRoman', b:'TimesRomanBold', i:'TimesRomanItalic', bi:'TimesRomanBoldItalic' } },
+  Courier:    { label: 'Courier',         std: { r:'Courier', b:'CourierBold', i:'CourierOblique', bi:'CourierBoldOblique' } },
+  roboto:     { label: 'Roboto',     pkg: 'roboto@0.4.3',     fam: 'Roboto' },
+  opensans:   { label: 'Open Sans',  pkg: 'open-sans@0.4.2',  fam: 'OpenSans' },
+  montserrat: { label: 'Montserrat', pkg: 'montserrat@0.4.2', fam: 'Montserrat' },
+  lato:       { label: 'Lato',       pkg: 'lato@0.4.1',       fam: 'Lato' },
+  inter:      { label: 'Inter',      pkg: 'inter@0.4.2',      fam: 'Inter' }
+};
+const VARIANT_FOLDERS = { r: '400Regular', b: '700Bold', i: '400Regular_Italic', bi: '700Bold_Italic' };
+const fontBytesCache = {};
+let restyling = false;
+
+// Lazy per-document font provider: embeds regular/bold/italic/bold-italic
+// variants on first use, with graceful fallback (bi -> b -> r, i -> r).
+function makeFontProvider(out, key) {
+  const def = FONT_DEFS[key];
+  const cache = {};
+  return async function get(bold, italic) {
+    let v = (bold ? 'b' : '') + (italic ? 'i' : '');
+    if (!v) v = 'r';
+    if (cache[v]) return cache[v];
+    const chain = { bi: ['bi','b','r'], b: ['b','r'], i: ['i','r'], r: ['r'] }[v];
+    for (const tryV of chain) {
+      try {
+        let font;
+        if (def.std) {
+          font = await out.embedFont(StandardFonts[def.std[tryV]]);
+        } else {
+          await requireLib('fontkit');
+          out.registerFontkit(window.fontkit);
+          const cacheKey = key + ':' + tryV;
+          if (!fontBytesCache[cacheKey]) {
+            const folder = VARIANT_FOLDERS[tryV];
+            const url = 'https://cdn.jsdelivr.net/npm/@expo-google-fonts/' + def.pkg +
+                        '/' + folder + '/' + def.fam + '_' + folder + '.ttf';
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('font download failed');
+            fontBytesCache[cacheKey] = await resp.arrayBuffer();
+          }
+          font = await out.embedFont(fontBytesCache[cacheKey], { subset: true });
+        }
+        cache[v] = font;
+        return font;
+      } catch (e) { /* try next fallback */ }
+    }
+    throw new Error('could not load ' + def.label);
+  };
+}
+
+function samplePx(data, w, h, x, y) {
+  x = Math.max(0, Math.min(w - 1, Math.round(x)));
+  y = Math.max(0, Math.min(h - 1, Math.round(y)));
+  const i = (y * w + x) * 4;
+  return [data[i], data[i+1], data[i+2]];
+}
+function lum(c) { return 0.299*c[0] + 0.587*c[1] + 0.114*c[2]; }
+
+async function restylePdf(fileRec, fontKey) {
+  await ensureLibs();
+  await requireLib('pdfjsLib');
+  if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  const SCALE = 2;
+  const src = await pdfjsLib.getDocument({ data: fileRec.bytes.slice(0) }).promise;
+  const out = await PDFDocument.create();
+  const getFont = makeFontProvider(out, fontKey);
+
+  for (let n = 1; n <= src.numPages; n++) {
+    setStatus('Changing font — page ' + n + ' of ' + src.numPages + '…');
+    const page = await src.getPage(n);
+    const vp1 = page.getViewport({ scale: 1 });
+    const pageW = vp1.width, pageH = vp1.height;
+    const rotated = (page.rotate % 360) !== 0;
+
+    const vp = page.getViewport({ scale: SCALE });
+    const cv = document.createElement('canvas');
+    cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
+    const textContent = rotated ? { items: [] } : await page.getTextContent();
+    const imgData = ctx.getImageData(0, 0, cv.width, cv.height);
+    const px = imgData.data;
+
+    const runs = [];
+    const symbolSpans = [];
+    for (const item of textContent.items) {
+      if (!item.str || !item.str.trim()) continue;
+      const tr = item.transform;
+      const size = Math.hypot(tr[2], tr[3]) || Math.abs(tr[3]) || 10;
+      const x = tr[4], yBase = tr[5];
+      const w = item.width || 0;
+      if (w <= 0) continue;
+
+      // original style, read from the embedded font's name
+      let fname = '';
+      try {
+        const fobj = page.commonObjs.get(item.fontName);
+        fname = (fobj && fobj.name) || '';
+      } catch (e) {}
+      const bold = /bold|black|heavy|semibold|demibold/i.test(fname);
+      const italic = /italic|oblique/i.test(fname);
+
+      // bullets & decorations drawn with symbol/emoji fonts: the extracted
+      // characters aren't real text (e.g. Word bullets stored as letters in
+      // Wingdings) — keep the original pixels untouched instead of redrawing
+      const symbolFont = /emoji|wingding|webding|symbol|dingbat|zapf|marlett/i.test(fname);
+      const symbolOnly = /^[\u2000-\u2BFF\u2C60-\u2E7F\uE000-\uF8FF\uFFFD]+$/.test(item.str.trim());
+      if (symbolFont || symbolOnly) {
+        // Capture the symbol's pixels (arrows, bullets) and blank its spot; the
+        // re-flow pass pastes it back shifted left to stay glued to its word
+        // when preceding text narrows in the new font.
+        const sCx = x * SCALE, sCw = w * SCALE;
+        const symTop = Math.max(0, Math.floor((pageH - (yBase + 0.82 * size)) * SCALE));
+        const symBot = Math.min(cv.height - 1, Math.ceil((pageH - (yBase - 0.26 * size)) * SCALE));
+        const symX0 = Math.max(0, Math.floor(sCx - 1));
+        const symX1 = Math.min(cv.width, Math.ceil(sCx + sCw + 1));
+        const symW = symX1 - symX0, symH = symBot - symTop + 1;
+        if (symW > 0 && symH > 0) {
+          const strip = ctx.getImageData(symX0, symTop, symW, symH);
+          const bgpx = samplePx(px, cv.width, cv.height, sCx, Math.max(0, symTop - 2));
+          const bg = lum(bgpx) > 200 ? [bgpx[0], bgpx[1], bgpx[2]] : [255, 255, 255];
+          ctx.fillStyle = 'rgb(' + bg.join(',') + ')';
+          ctx.fillRect(symX0, symTop, symW, symH);
+          symbolSpans.push({ origX: x, origW: w, size, y: yBase, strip, symX0, symTop, symW, symH });
+        }
+        continue;
+      }
+
+      const y0 = yBase - 0.30 * size, y1 = yBase + 0.82 * size;
+      const cx = x * SCALE, cyTop = (pageH - y1) * SCALE;
+      const cw = w * SCALE, ch = (y1 - y0) * SCALE;
+
+      // underline vs table border: check EVERY pixel row in a band below the
+      // baseline (thin 1-2px underlines slip between spot-checked rows).
+      // A dark row extending well past BOTH ends of the text is a table
+      // border or rule, not an underline — remember it so the erase can
+      // repaint it instead of leaving a gap.
+      const borderRows = [];
+      const ulRows = [];
+      const bandTop = (pageH - (yBase - 0.03 * size)) * SCALE;
+      const bandBot = (pageH - (yBase - 0.30 * size)) * SCALE;
+      for (let uy = Math.floor(bandTop); uy <= Math.ceil(bandBot); uy++) {
+        let dark = 0, total = 0;
+        for (let sx = cx + 2; sx < cx + cw - 2; sx += 2) {
+          total++;
+          if (lum(samplePx(px, cv.width, cv.height, sx, uy)) < 150) dark++;
+        }
+        if (total > 4 && dark / total > 0.7) {
+          const leftPx = samplePx(px, cv.width, cv.height, cx - 6, uy);
+          const rightPx = samplePx(px, cv.width, cv.height, cx + cw + 6, uy);
+          if (lum(leftPx) < 150 && lum(rightPx) < 150) {
+            borderRows.push({ uy });
+          } else {
+            ulRows.push({ uy, cont: lum(rightPx) < 150 });
+          }
+        }
+      }
+
+
+      // text color: darkest sampled pixel inside the box
+      let darkest = [255,255,255], dLum = 256;
+      const stepX = Math.max(1, Math.floor(cw / 40));
+      const stepY = Math.max(1, Math.floor(ch / 8));
+      for (let sy = cyTop + 1; sy < cyTop + ch - 1; sy += stepY) {
+        for (let sx = cx + 1; sx < cx + cw - 1; sx += stepX) {
+          const p = samplePx(px, cv.width, cv.height, sx, sy);
+          const l = lum(p);
+          if (l < dLum) { dLum = l; darkest = p; }
+        }
+      }
+      // if nothing in the box is meaningfully dark, the original text was
+      // invisible (e.g. white 'helper' characters Word hides in headers) —
+      // leave it invisible rather than materializing it in black
+      if (dLum > 235) continue;
+
+      const chroma = Math.max(...darkest) - Math.min(...darkest);
+      let textColor;
+      if (dLum < 60) textColor = darkest;
+      else if (dLum < 170 && chroma > 40) textColor = darkest;
+      else textColor = [0,0,0];
+
+      // background = lighter of the pixels just left of / above the box
+      const bgL = samplePx(px, cv.width, cv.height, cx - 4, cyTop + ch/2);
+      const bgT = samplePx(px, cv.width, cv.height, cx + cw/2, cyTop - 4);
+      const bg = lum(bgL) >= lum(bgT) ? bgL : bgT;
+
+      // pre-compute the replacement text now: the new font is often a
+      // different width, and text-hugging underlines must be restored only
+      // as wide as the replacement text
+      let drawFont = null, drawStr = item.str.replace(/[\uE000-\uF8FF\uFFFD]/g, '-'), drawSize = size, drawW = w, drawNatW = w;
+      try {
+        drawFont = await getFont(bold, italic);
+        let tw;
+        try { tw = drawFont.widthOfTextAtSize(drawStr, drawSize); }
+        catch (e) {
+          drawStr = sanitizeForWinAnsi(drawStr);
+          tw = drawFont.widthOfTextAtSize(drawStr, drawSize);
+        }
+        drawNatW = tw;
+        if (tw > w && tw > 0) { drawSize = drawSize * (w / tw); drawNatW = w; }
+        drawW = Math.min(tw, w);
+      } catch (e) { drawFont = null; }
+      if (!drawFont) continue; // can't draw a replacement — keep original pixels
+
+      ctx.fillStyle = 'rgb(' + bg.join(',') + ')';
+      ctx.fillRect(cx - 1, cyTop - 1, cw + 2, ch + 2);
+
+      // restore rules the erase wiped through by copying ORIGINAL pixels
+      // back — pixel-perfect. Rules that continue past the text (header
+      // rules, table borders, multi-word underlines) are restored across the
+      // full run width; underlines that end with the text are restored only
+      // as wide as the replacement text, so they hug the new word exactly.
+      const fullRows = [...borderRows.map(b => b.uy), ...ulRows.filter(u => u.cont).map(u => u.uy)];
+      const trimRows = ulRows.filter(u => !u.cont).map(u => u.uy);
+      const restoreStrip = (rows, spanW) => {
+        if (!rows.length) return;
+        rows = [...new Set(rows)].sort((a, b) => a - b);
+        const groups = [];
+        let gs = rows[0], ge = rows[0];
+        for (let i = 1; i < rows.length; i++) {
+          if (rows[i] <= ge + 2) ge = rows[i];
+          else { groups.push([gs, ge]); gs = ge = rows[i]; }
+        }
+        groups.push([gs, ge]);
+        const stripX = Math.max(0, Math.floor(cx - 1));
+        const stripW = Math.min(cv.width - stripX, Math.ceil(spanW + 2));
+        for (const [g0, g1] of groups) {
+          const top = Math.max(0, g0 - 1), bot = Math.min(cv.height - 1, g1 + 1);
+          const stripH = bot - top + 1;
+          if (stripW <= 0 || stripH <= 0) continue;
+          const strip = ctx.createImageData(stripW, stripH);
+          for (let yy = 0; yy < stripH; yy++) {
+            for (let xx = 0; xx < stripW; xx++) {
+              const si = ((top + yy) * cv.width + (stripX + xx)) * 4;
+              const di = (yy * stripW + xx) * 4;
+              strip.data[di] = px[si]; strip.data[di + 1] = px[si + 1];
+              strip.data[di + 2] = px[si + 2]; strip.data[di + 3] = 255;
+            }
+          }
+          ctx.putImageData(strip, stripX, top);
+        }
+      };
+      restoreStrip(fullRows, cw);
+      restoreStrip(trimRows, drawW * SCALE);
+
+      runs.push({ drawStr, x, y: yBase, drawSize, drawFont, color: textColor, origX: x, origW: w, natW: drawNatW, size });
+    }
+
+    // Re-flow horizontal gaps. A narrower replacement font ends each text run
+    // sooner; the next element (text OR a preserved symbol like an arrow/bullet)
+    // still sits at its original x, opening a gap mid-line. Build one ordered
+    // list of text runs and symbol strips per line and slide each element left
+    // by the cumulative narrowing of the flowing text before it — keeping
+    // arrows glued to their words and sentences tight. A large original gap
+    // (table columns, bullet indents, right-aligned dates) resets the shift.
+    const elems = [
+      ...runs.map(r => ({ kind: 'text', r, origX: r.origX, origW: r.origW, natW: r.natW, size: r.size, y: r.y })),
+      ...symbolSpans.map(s => ({ kind: 'sym', s, origX: s.origX, origW: s.origW, natW: s.origW, size: s.size, y: s.y }))
+    ];
+    const byLine = {};
+    for (const e of elems) {
+      const lk = Math.round(e.y);
+      (byLine[lk] = byLine[lk] || []).push(e);
+    }
+    for (const lk in byLine) {
+      const line = byLine[lk].sort((a, b) => a.origX - b.origX);
+      let shift = 0;
+      for (let i = 0; i < line.length; i++) {
+        const e = line[i];
+        if (i > 0) {
+          const prev = line[i - 1];
+          const origGap = e.origX - (prev.origX + prev.origW);
+          if (origGap > 0.75 * e.size || origGap < 0) shift = 0;
+          else shift += (prev.origW - prev.natW);
+        }
+        e.shift = shift;
+        if (e.kind === 'text') e.r.x = e.origX - shift;
+      }
+    }
+
+    // Paste symbol strips at their (possibly shifted) positions BEFORE flatten.
+    for (const e of elems) {
+      if (e.kind !== 'sym') continue;
+      const s = e.s;
+      const destX = Math.round(s.symX0 - (e.shift || 0) * SCALE);
+      const okX = (e.shift && destX >= 0 && destX + s.symW <= cv.width) ? destX : s.symX0;
+      ctx.putImageData(s.strip, okX, s.symTop);
+    }
+
+    const jpgBytes = dataUrlToBytes(cv.toDataURL('image/jpeg', 0.85));
+    const embedded = await out.embedJpg(jpgBytes);
+    const newPage = out.addPage([pageW, pageH]);
+    newPage.drawImage(embedded, { x: 0, y: 0, width: pageW, height: pageH });
+
+    for (const r of runs) {
+      const color = rgb(r.color[0]/255, r.color[1]/255, r.color[2]/255);
+      try {
+        newPage.drawText(r.drawStr, { x: r.x, y: r.y, size: r.drawSize, font: r.drawFont, color });
+      } catch (e) { /* skip unencodable run */ }
+    }
+    await new Promise(res => setTimeout(res, 0));
+  }
+  return await out.save();
+}
+
+async function runRestyle(fileId) {
+  if (restyling) return;
+  const f = fileById(fileId);
+  if (!f) return;
+  const key = fontSelect.value;
+  restyling = true;
+  render();
+  try {
+    const bytes = await restylePdf(f, key);
+    // Replace the original file's contents in place — keep its name, position
+    // in the merge order, and page structure, just swap in the restyled bytes.
+    f.bytes = bytes;
+    f.size = bytes.byteLength;
+    f.restyledFont = FONT_DEFS[key].label;
+    // refresh page thumbnails for this file (they now show the new font)
+    pages.forEach(p => { if (p.fileId === f.id) p.thumb = null; });
+    invalidateOutput();
+    setStatus('Done — ' + f.name + ' is now in ' + FONT_DEFS[key].label + '.', 'ok');
+  } catch (e) {
+    console.error(e);
+    setStatus('Font change failed: ' + e.message, 'err');
+  }
+  restyling = false;
+  render();
+  renderThumbs();
+}
+
+function renderFontList() {
+  fontList.innerHTML = '';
+  files.forEach(f => {
+    const li = document.createElement('li');
+    li.className = 'file-row';
+    li.innerHTML =
+      '<div class="order-badge" style="background:'+f.color+'">Aa</div>'+
+      '<div class="file-info"><div class="file-name" title="'+f.name+'">'+f.name+'</div>'+
+      '<div class="file-meta">'+f.pages+' page'+(f.pages===1?'':'s')+' · '+fmtSize(f.size)+(f.restyledFont?' · now in '+f.restyledFont:'')+'</div></div>'+
+      '<div class="row-actions">'+
+        '<button class="small-btn" data-act="restyle"'+(restyling?' disabled':'')+'>'+(restyling?'Working…':'Change font')+'</button>'+
+      '</div>';
+    li.addEventListener('click', e => {
+      if (e.target.dataset.act === 'restyle' && !restyling) runRestyle(f.id);
+    });
+    fontList.appendChild(li);
+  });
+}
+
+/* ---------- Touch drag (HTML5 drag-and-drop doesn't fire on touchscreens) ---------- */
+function wireTouchDrag(el, container, itemSel, commit) {
+  const handle = el.querySelector('.drag-handle');
+  if (!handle) return;
+  handle.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse') return; // mouse uses native drag-and-drop
+    e.preventDefault();
+    el.classList.add('dragging');
+    let target = null;
+    const move = ev => {
+      ev.preventDefault();
+      const t = document.elementFromPoint(ev.clientX, ev.clientY);
+      const card = t ? t.closest(itemSel) : null;
+      container.querySelectorAll('.drop-target').forEach(x => x.classList.remove('drop-target'));
+      target = (card && card !== el) ? card : null;
+      if (target) target.classList.add('drop-target');
+      // auto-scroll near screen edges
+      if (ev.clientY < 70) window.scrollBy(0, -14);
+      else if (ev.clientY > window.innerHeight - 70) window.scrollBy(0, 14);
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', up);
+      el.classList.remove('dragging');
+      container.querySelectorAll('.drop-target').forEach(x => x.classList.remove('drop-target'));
+      if (target) commit(target); else render();
+    };
+    document.addEventListener('pointermove', move, { passive: false });
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', up);
+  });
+}
+
+/* ---------- Files mode ---------- */
+function moveFile(id, dir) {
+  invalidateOutput();
+  const i = files.findIndex(f => f.id === id);
+  const j = i + dir;
+  if (j < 0 || j >= files.length) return;
+  [files[i], files[j]] = [files[j], files[i]];
+  rebuildPagesFromFiles();
+  render();
+}
+function removeFileRec(id) {
+  invalidateOutput();
+  files = files.filter(f => f.id !== id);
+  pages = pages.filter(p => p.fileId !== id);
+  converted = converted.filter(c => c.id !== id);
+  render();
+}
+function rebuildPagesFromFiles() {
+  const byFile = {};
+  for (const p of pages) (byFile[p.fileId] = byFile[p.fileId] || []).push(p);
+  for (const k in byFile) byFile[k].sort((a,b) => a.srcIndex - b.srcIndex);
+  pages = files.flatMap(f => byFile[f.id] || []);
+}
+
+/* ---------- Pages mode ---------- */
+function movePage(uid, dir) {
+  invalidateOutput();
+  const i = pages.findIndex(p => p.uid === uid);
+  const j = i + dir;
+  if (j < 0 || j >= pages.length) return;
+  [pages[i], pages[j]] = [pages[j], pages[i]];
+  render();
+}
+function removePage(uid) {
+  invalidateOutput();
+  pages = pages.filter(p => p.uid !== uid);
+  files = files.filter(f => pages.some(p => p.fileId === f.id));
+  converted = converted.filter(c => files.some(f => f.id === c.id));
+  render();
+}
+
+/* ---------- Thumbnails ---------- */
+let thumbQueueRunning = false;
+async function renderThumbs() {
+  if (thumbQueueRunning) return;
+  try {
+    await requireLib('pdfjsLib');
+  } catch (e) {
+    return; // previews unavailable — placeholders stay, reordering still works
+  }
+  if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  await ensureLibs();
+  thumbQueueRunning = true;
+  const docCache = {};
+  while (true) {
+    const p = pages.find(p => !p.thumb);
+    if (!p) break;
+    try {
+      if (!docCache[p.fileId]) {
+        const f = fileById(p.fileId);
+        docCache[p.fileId] = await pdfjsLib.getDocument({ data: f.bytes.slice(0) }).promise;
+      }
+      const pg = await docCache[p.fileId].getPage(p.srcIndex + 1);
+      const vp = pg.getViewport({ scale: 1 });
+      const v2 = pg.getViewport({ scale: 180 / vp.width });
+      const cv = document.createElement('canvas');
+      cv.width = v2.width; cv.height = v2.height;
+      await pg.render({ canvasContext: cv.getContext('2d'), viewport: v2 }).promise;
+      p.thumb = cv.toDataURL('image/jpeg', 0.7);
+      const box = pageGrid.querySelector('[data-uid="' + p.uid + '"] .thumb-box');
+      if (box) box.innerHTML = '<img src="' + p.thumb + '" alt="">';
+    } catch (e) {
+      p.thumb = 'err';
+    }
+  }
+  thumbQueueRunning = false;
+}
+
+/* ---------- Rendering ---------- */
+function render() {
+  const totalPages = pages.length;
+  mergeBtn.disabled = totalPages < 1;
+  fileList.style.display = 'none';
+  pageGrid.style.display = 'none';
+  convertList.style.display = 'none';
+  fontList.style.display = 'none';
+  signList.style.display = 'none';
+  viewPane.style.display = 'none';
+  openZone.style.display = 'none';
+
+  if (mode === 'files') {
+    lineupTitle.textContent = 'Merge Order';
+    countLabel.textContent = files.length + ' file' + (files.length===1?'':'s') +
+      (files.length ? ' · ' + totalPages + ' pages total' : '');
+    emptyState.textContent = 'No files yet — add some PDFs above to get started.';
+    emptyState.style.display = files.length ? 'none' : 'block';
+    fileList.style.display = '';
+    renderFileList();
+  } else if (mode === 'pages') {
+    lineupTitle.textContent = 'Page Order';
+    countLabel.textContent = totalPages + ' page' + (totalPages===1?'':'s') +
+      (files.length ? ' from ' + files.length + ' file' + (files.length===1?'':'s') : '');
+    emptyState.textContent = 'No pages yet — add some PDFs above to get started.';
+    emptyState.style.display = files.length ? 'none' : 'block';
+    pageGrid.style.display = '';
+    renderPageGrid();
+  } else if (mode === 'font') {
+    lineupTitle.textContent = 'Change Font';
+    countLabel.textContent = files.length + ' file' + (files.length===1?'':'s');
+    emptyState.textContent = 'No files yet — add PDFs in the Files tab first, then come back here.';
+    emptyState.style.display = files.length ? 'none' : 'block';
+    fontList.style.display = '';
+    renderFontList();
+  } else if (mode === 'sign') {
+    lineupTitle.textContent = signatureDataUrl ? 'Choose a Page to Sign' : 'Create a Signature';
+    countLabel.textContent = files.length + ' file' + (files.length===1?'':'s');
+    const needFiles = files.length === 0;
+    emptyState.textContent = needFiles
+      ? 'No files yet — add PDFs in the Files tab first, then come back here.'
+      : (signatureDataUrl ? '' : 'Draw or type your signature above, then save it.');
+    emptyState.style.display = (needFiles || !signatureDataUrl) ? 'block' : 'none';
+    if (signatureDataUrl && !needFiles) { signList.style.display = ''; renderSignList(); }
+  } else if (mode === 'view') {
+    lineupTitle.textContent = standaloneDoc ? 'Viewing' : 'Preview Result';
+    countLabel.textContent = standaloneDoc ? standaloneDoc.name : (totalPages + ' page' + (totalPages===1?'':'s'));
+    emptyState.style.display = 'none';
+    openZone.style.display = '';
+    viewPane.style.display = '';
+    renderView();
+  } else {
+    lineupTitle.textContent = 'Converted Files';
+    countLabel.textContent = converted.length + ' converted';
+    emptyState.textContent = 'Nothing converted yet — drop an image, Word doc, or text file above.';
+    emptyState.style.display = converted.length ? 'none' : 'block';
+    convertList.style.display = '';
+    renderConvertList();
+  }
+}
+
+function renderFileList() {
+  fileList.innerHTML = '';
+  files.forEach((f, idx) => {
+    const li = document.createElement('li');
+    li.className = 'file-row';
+    li.draggable = true;
+    li.dataset.fid = f.id;
+    const kept = pages.filter(p => p.fileId === f.id).length;
+    const pageNote = kept === f.pages ? f.pages + ' page' + (f.pages===1?'':'s')
+                                      : kept + ' of ' + f.pages + ' pages kept';
+    li.innerHTML =
+      '<span class="drag-handle" aria-hidden="true">⠿</span>'+
+      '<div class="order-badge" style="background:'+f.color+'">'+(idx+1)+'</div>'+
+      '<div class="file-info"><div class="file-name" title="'+f.name+'">'+f.name+'</div>'+
+      '<div class="file-meta">'+pageNote+' · '+fmtSize(f.size)+(f.converted?' · converted':'')+'</div></div>'+
+      '<div class="row-actions">'+
+        '<button class="icon-btn" aria-label="Move up" '+(idx===0?'disabled':'')+' data-act="up">▲</button>'+
+        '<button class="icon-btn" aria-label="Move down" '+(idx===files.length-1?'disabled':'')+' data-act="down">▼</button>'+
+        '<button class="icon-btn remove" aria-label="Remove '+f.name+'" data-act="remove">✕</button>'+
+      '</div>';
+    li.addEventListener('click', e => {
+      const act = e.target.dataset.act;
+      if (act === 'up') moveFile(f.id, -1);
+      if (act === 'down') moveFile(f.id, 1);
+      if (act === 'remove') removeFileRec(f.id);
+    });
+    li.addEventListener('dragstart', () => { dragFileId = f.id; li.classList.add('dragging'); });
+    li.addEventListener('dragend', () => { dragFileId = null; render(); });
+    li.addEventListener('dragover', e => { e.preventDefault(); if (dragFileId !== null && dragFileId !== f.id) li.classList.add('drop-target'); });
+    li.addEventListener('dragleave', () => li.classList.remove('drop-target'));
+    li.addEventListener('drop', e => {
+      e.preventDefault();
+      if (dragFileId === null || dragFileId === f.id) return;
+      const from = files.findIndex(x => x.id === dragFileId);
+      const to = files.findIndex(x => x.id === f.id);
+      const [moved] = files.splice(from, 1);
+      files.splice(to, 0, moved);
+      rebuildPagesFromFiles();
+      render();
+    });
+    wireTouchDrag(li, fileList, '.file-row', targetEl => {
+      const from = files.findIndex(x => x.id === f.id);
+      const to = files.findIndex(x => x.id === Number(targetEl.dataset.fid));
+      if (from < 0 || to < 0) { render(); return; }
+      const [moved] = files.splice(from, 1);
+      files.splice(to, 0, moved);
+      rebuildPagesFromFiles();
+      render();
+    });
+    fileList.appendChild(li);
+  });
+}
+
+function renderPageGrid() {
+  pageGrid.innerHTML = '';
+  pages.forEach((p, idx) => {
+    const f = fileById(p.fileId);
+    const li = document.createElement('li');
+    li.className = 'page-card';
+    li.draggable = true;
+    li.dataset.uid = p.uid;
+    const thumbHtml = p.thumb && p.thumb !== 'err'
+      ? '<img src="'+p.thumb+'" alt="">'
+      : (p.thumb === 'err' ? '<span class="thumb-loading">preview unavailable</span>'
+                           : '<span class="thumb-loading">loading…</span>');
+    li.innerHTML =
+      '<div class="pg-num">'+(idx+1)+'</div>'+
+      '<div class="drag-handle pg-handle" aria-hidden="true">⠿</div>'+
+      '<div class="thumb-box">'+thumbHtml+'</div>'+
+      '<div class="pg-src"><span class="src-dot" style="background:'+f.color+'"></span>'+
+      '<span class="pg-src-name" title="'+f.name+'">'+f.name+' · p.'+(p.srcIndex+1)+'</span></div>'+
+      '<div class="pg-actions">'+
+        '<button class="icon-btn" aria-label="Move earlier" '+(idx===0?'disabled':'')+' data-act="up">◀</button>'+
+        '<button class="icon-btn" aria-label="Move later" '+(idx===pages.length-1?'disabled':'')+' data-act="down">▶</button>'+
+        '<button class="icon-btn remove" aria-label="Remove page" data-act="remove">✕</button>'+
+      '</div>';
+    li.addEventListener('click', e => {
+      const act = e.target.dataset.act;
+      if (act === 'up') movePage(p.uid, -1);
+      if (act === 'down') movePage(p.uid, 1);
+      if (act === 'remove') removePage(p.uid);
+    });
+    li.addEventListener('dragstart', () => { dragPageUid = p.uid; li.classList.add('dragging'); });
+    li.addEventListener('dragend', () => { dragPageUid = null; render(); });
+    li.addEventListener('dragover', e => { e.preventDefault(); if (dragPageUid !== null && dragPageUid !== p.uid) li.classList.add('drop-target'); });
+    li.addEventListener('dragleave', () => li.classList.remove('drop-target'));
+    li.addEventListener('drop', e => {
+      e.preventDefault();
+      if (dragPageUid === null || dragPageUid === p.uid) return;
+      const from = pages.findIndex(x => x.uid === dragPageUid);
+      const to = pages.findIndex(x => x.uid === p.uid);
+      const [moved] = pages.splice(from, 1);
+      pages.splice(to, 0, moved);
+      render();
+    });
+    wireTouchDrag(li, pageGrid, '.page-card', targetEl => {
+      const from = pages.findIndex(x => x.uid === p.uid);
+      const to = pages.findIndex(x => x.uid === Number(targetEl.dataset.uid));
+      if (from < 0 || to < 0) { render(); return; }
+      const [moved] = pages.splice(from, 1);
+      pages.splice(to, 0, moved);
+      render();
+    });
+    pageGrid.appendChild(li);
+  });
+}
+
+let viewRenderToken = 0;
+
+async function openToView(file) {
+  try {
+    standaloneDoc = { name: file.name, bytes: await file.arrayBuffer() };
+    render();
+  } catch (e) {
+    setStatus('Could not open "' + file.name + '" — it may be corrupted or password-protected.', 'err');
+  }
+}
+
+async function renderView() {
+  const token = ++viewRenderToken; // cancel stale renders if user leaves/returns
+  viewPane.innerHTML = '';
+
+  const isStandalone = !!standaloneDoc;
+  if (!isStandalone && !pages.length) {
+    viewPane.innerHTML = '<div class="empty-state">Nothing to preview yet — add PDFs in the Files tab, or open a PDF above just to view it.</div>';
+    return;
+  }
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'view-toolbar';
+  toolbar.innerHTML = '<div class="view-status" id="viewStatus"></div>' +
+    (isStandalone
+      ? '<div style="display:flex;gap:8px;"><button class="small-btn" id="viewBack">Close</button></div>'
+      : '<button class="small-btn" id="viewDownload">Download this</button>');
+  viewPane.appendChild(toolbar);
+  const strip = document.createElement('div');
+  strip.className = 'view-strip';
+  viewPane.appendChild(strip);
+  const vStatus = $('viewStatus');
+  if (isStandalone) {
+    $('viewBack').addEventListener('click', () => { standaloneDoc = null; render(); });
+  } else {
+    $('viewDownload').addEventListener('click', () => merge());
+  }
+
+  try {
+    await requireLib('pdfjsLib');
+    if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  } catch (e) {
+    vStatus.textContent = 'Preview needs to load its engine — check your connection.';
+    return;
+  }
+
+  let doc = null, pageCount = pages.length;
+  if (isStandalone) {
+    try {
+      doc = await pdfjsLib.getDocument({ data: standaloneDoc.bytes.slice(0) }).promise;
+      pageCount = doc.numPages;
+    } catch (e) {
+      vStatus.textContent = 'Couldn\u2019t open this PDF — it may be corrupted or password-protected.';
+      return;
+    }
+    if (token !== viewRenderToken) return;
+  }
+
+  // placeholders first so the whole document's shape is visible immediately
+  const slots = Array.from({ length: pageCount }, (_, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'view-page';
+    wrap.innerHTML = '<div class="view-loading">rendering page ' + (i + 1) + '…</div><span class="view-pnum">' + (i + 1) + '</span>';
+    strip.appendChild(wrap);
+    return wrap;
+  });
+  vStatus.textContent = isStandalone
+    ? pageCount + ' page' + (pageCount === 1 ? '' : 's') + ' — ' + standaloneDoc.name
+    : 'Previewing ' + pageCount + ' page' + (pageCount === 1 ? '' : 's') + ' — the full merged result with every edit applied.';
+
+  const docCache = {};
+  for (let i = 0; i < pageCount; i++) {
+    if (token !== viewRenderToken) return; // user navigated away
+    try {
+      let pg;
+      if (isStandalone) {
+        pg = await doc.getPage(i + 1);
+      } else {
+        const p = pages[i];
+        if (!docCache[p.fileId]) {
+          docCache[p.fileId] = await pdfjsLib.getDocument({ data: fileById(p.fileId).bytes.slice(0) }).promise;
+        }
+        pg = await docCache[p.fileId].getPage(p.srcIndex + 1);
+      }
+      const vp = pg.getViewport({ scale: 1 });
+      const scale = Math.min(2, 1400 / vp.width); // crisp but bounded
+      const v2 = pg.getViewport({ scale });
+      const cv = document.createElement('canvas');
+      cv.width = v2.width; cv.height = v2.height;
+      await pg.render({ canvasContext: cv.getContext('2d'), viewport: v2 }).promise;
+      if (token !== viewRenderToken) return;
+      slots[i].innerHTML = '<img src="' + cv.toDataURL('image/jpeg', 0.82) + '" alt="Page ' + (i + 1) + '"><span class="view-pnum">' + (i + 1) + '</span>';
+    } catch (e) {
+      slots[i].innerHTML = '<div class="view-loading">couldn\u2019t render page ' + (i + 1) + '</div><span class="view-pnum">' + (i + 1) + '</span>';
+    }
+  }
+}
+
+function renderConvertList() {
+  convertList.innerHTML = '';
+  converted.forEach(c => {
+    const f = fileById(c.id);
+    const li = document.createElement('li');
+    li.className = 'file-row';
+    li.innerHTML =
+      '<div class="type-badge">PDF</div>'+
+      '<div class="file-info"><div class="file-name" title="'+c.name+'">'+c.name+'</div>'+
+      '<div class="file-meta">from '+c.origName+' · '+c.pages+' page'+(c.pages===1?'':'s')+' · '+fmtSize(c.size)+' · in merge order</div></div>'+
+      '<div class="row-actions">'+
+        '<button class="small-btn" data-act="download">Download</button>'+
+        '<button class="icon-btn remove" aria-label="Remove '+c.name+'" data-act="remove">✕</button>'+
+      '</div>';
+    li.addEventListener('click', e => {
+      const act = e.target.dataset.act;
+      if (act === 'download' && f) downloadPdf(f.bytes, c.name);
+      if (act === 'remove') removeFileRec(c.id);
+    });
+    convertList.appendChild(li);
+  });
+}
+
+/* ---------- Signatures ---------- */
+const SIG_FONTS = [
+  { key: 'dancing', label: 'Dancing Script', url: 'https://cdn.jsdelivr.net/npm/@fontsource/dancing-script@5.0.7/files/dancing-script-latin-600-normal.woff2', css: '"Dancing Script"' },
+  { key: 'greatvibes', label: 'Great Vibes', url: 'https://cdn.jsdelivr.net/npm/@fontsource/great-vibes@5.0.11/files/great-vibes-latin-400-normal.woff2', css: '"Great Vibes"' },
+  { key: 'pacifico', label: 'Pacifico', url: 'https://cdn.jsdelivr.net/npm/@fontsource/pacifico@5.0.9/files/pacifico-latin-400-normal.woff2', css: '"Pacifico"' },
+  { key: 'sacramento', label: 'Sacramento', url: 'https://cdn.jsdelivr.net/npm/@fontsource/sacramento@5.0.8/files/sacramento-latin-400-normal.woff2', css: '"Sacramento"' }
+];
+let sigTypeFont = SIG_FONTS[0];
+const loadedSigFonts = {};
+
+async function loadSigFont(def) {
+  if (loadedSigFonts[def.key]) return;
+  try {
+    const ff = new FontFace(def.css.replace(/"/g, ''), 'url(' + def.url + ')');
+    await ff.load();
+    document.fonts.add(ff);
+    loadedSigFonts[def.key] = true;
+  } catch (e) { /* fall back to system cursive */ }
+}
+
+// --- Draw canvas ---
+let drawing = false, sigHasInk = false, sigCtx = null;
+function initSigCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = sigCanvas.getBoundingClientRect();
+  sigCanvas.width = Math.round(rect.width * dpr);
+  sigCanvas.height = Math.round(200 * dpr);
+  sigCtx = sigCanvas.getContext('2d');
+  sigCtx.scale(dpr, dpr);
+  sigCtx.lineWidth = 2.4;
+  sigCtx.lineCap = 'round';
+  sigCtx.lineJoin = 'round';
+  sigCtx.strokeStyle = '#12233f';
+  sigHasInk = false;
+}
+function sigPos(e) {
+  const r = sigCanvas.getBoundingClientRect();
+  const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+  const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+  return { x: cx, y: cy };
+}
+function sigDown(e) { e.preventDefault(); drawing = true; const p = sigPos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); }
+function sigMove(e) { if (!drawing) return; e.preventDefault(); const p = sigPos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); sigHasInk = true; }
+function sigUp() { drawing = false; }
+
+// Trim transparent margins and return a tight PNG data URL
+function trimCanvas(srcCanvas) {
+  const w = srcCanvas.width, h = srcCanvas.height;
+  const d = srcCanvas.getContext('2d').getImageData(0, 0, w, h).data;
+  let minX = w, minY = h, maxX = 0, maxY = 0, found = false;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (d[(y * w + x) * 4 + 3] > 10) { found = true; if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+  }
+  if (!found) return null;
+  const pad = 6;
+  minX = Math.max(0, minX - pad); minY = Math.max(0, minY - pad);
+  maxX = Math.min(w - 1, maxX + pad); maxY = Math.min(h - 1, maxY + pad);
+  const tw = maxX - minX + 1, th = maxY - minY + 1;
+  const out = document.createElement('canvas');
+  out.width = tw; out.height = th;
+  out.getContext('2d').drawImage(srcCanvas, minX, minY, tw, th, 0, 0, tw, th);
+  return out.toDataURL('image/png');
+}
+
+// Render a typed signature to a transparent PNG
+async function typedSignaturePng(text, def) {
+  await loadSigFont(def);
+  const scale = 4, fontPx = 90;
+  const meas = document.createElement('canvas').getContext('2d');
+  meas.font = fontPx + 'px ' + def.css + ', cursive';
+  const w = Math.ceil(meas.measureText(text).width) + 40;
+  const cv = document.createElement('canvas');
+  cv.width = w * scale / 2; cv.height = 150 * scale / 2;
+  const ctx = cv.getContext('2d');
+  ctx.scale(scale / 2, scale / 2);
+  ctx.font = fontPx + 'px ' + def.css + ', cursive';
+  ctx.fillStyle = '#12233f';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 20, 75);
+  return trimCanvas(cv);
+}
+
+function renderSigFontPicker() {
+  sigFontPicker.innerHTML = '';
+  SIG_FONTS.forEach(def => {
+    loadSigFont(def);
+    const d = document.createElement('div');
+    d.className = 'sig-font-opt' + (def.key === sigTypeFont.key ? ' selected' : '');
+    d.style.fontFamily = def.css + ', cursive';
+    d.textContent = sigTypeInput.value.trim() || 'Your Name';
+    d.addEventListener('click', () => { sigTypeFont = def; renderSigFontPicker(); });
+    sigFontPicker.appendChild(d);
+  });
+}
+
+function setSignMode(m) {
+  signMode = m;
+  signDrawTab.classList.toggle('active', m === 'draw');
+  signTypeTab.classList.toggle('active', m === 'type');
+  signDrawPane.style.display = m === 'draw' ? '' : 'none';
+  signTypePane.style.display = m === 'type' ? '' : 'none';
+  if (m === 'draw' && !sigCtx) setTimeout(initSigCanvas, 0);
+  if (m === 'type') renderSigFontPicker();
+}
+
+async function saveSignature() {
+  if (signMode === 'draw') {
+    if (!sigHasInk) { setStatus('Draw your signature first.', 'err'); return; }
+    signatureDataUrl = trimCanvas(sigCanvas);
+  } else {
+    const text = sigTypeInput.value.trim();
+    if (!text) { setStatus('Type your name first.', 'err'); return; }
+    signatureDataUrl = await typedSignaturePng(text, sigTypeFont);
+  }
+  if (!signatureDataUrl) { setStatus('Signature looks empty — try again.', 'err'); return; }
+  sigSavedNote.style.display = '';
+  sigBoxImg.src = signatureDataUrl;
+  setStatus('Signature saved. Pick a page below to place it.', 'ok');
+  render();
+}
+
+function renderSignList() {
+  signList.innerHTML = '';
+  if (!signatureDataUrl) return;
+  // one row per page across all files, so the user picks where to sign
+  let idx = 0;
+  files.forEach(f => {
+    for (let i = 0; i < f.pages; i++) {
+      const li = document.createElement('li');
+      li.className = 'file-row';
+      const label = f.pages > 1 ? f.name + ' — page ' + (i + 1) : f.name;
+      li.innerHTML =
+        '<div class="order-badge" style="background:'+f.color+'">✎</div>'+
+        '<div class="file-info"><div class="file-name" title="'+label+'">'+label+'</div>'+
+        '<div class="file-meta">place your signature on this page</div></div>'+
+        '<div class="row-actions"><button class="small-btn" data-act="place">Place signature</button></div>';
+      const fid = f.id, si = i;
+      li.addEventListener('click', e => { if (e.target.dataset.act === 'place') openPlacement(fid, si); });
+      signList.appendChild(li);
+      idx++;
+    }
+  });
+}
+
+// --- Placement overlay ---
+async function openPlacement(fileId, srcIndex) {
+  if (!signatureDataUrl) return;
+  placeTarget = { fileId, srcIndex };
+  await requireLib('pdfjsLib');
+  if (!window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  const f = fileById(fileId);
+  const doc = await pdfjsLib.getDocument({ data: f.bytes.slice(0) }).promise;
+  const page = await doc.getPage(srcIndex + 1);
+  const vp = page.getViewport({ scale: 2 });
+  const cv = document.createElement('canvas');
+  cv.width = vp.width; cv.height = vp.height;
+  await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+  placePageImg.src = cv.toDataURL('image/jpeg', 0.85);
+  sigBoxImg.src = signatureDataUrl;
+  // size the sig box to a sensible default relative to page width, keeping aspect
+  const img = new Image();
+  img.onload = () => {
+    placeOverlay.style.display = 'flex';
+    // wait for layout, then size the box
+    setTimeout(() => {
+      const stageW = placePageImg.clientWidth || 500;
+      const boxW = Math.min(stageW * 0.32, 220);
+      const boxH = boxW * (img.height / img.width);
+      sigBox.style.width = boxW + 'px';
+      sigBox.style.height = boxH + 'px';
+      sigBox.style.left = (stageW * 0.55) + 'px';
+      sigBox.style.top = (placePageImg.clientHeight * 0.8) + 'px';
+    }, 30);
+  };
+  img.src = signatureDataUrl;
+}
+
+function closePlacement() { placeOverlay.style.display = 'none'; placeTarget = null; }
+
+// drag & resize within the stage
+(function () {
+  let mode = null, sx = 0, sy = 0, bx = 0, by = 0, bw = 0, bh = 0, ar = 1;
+  function bounds() { return placeStage.getBoundingClientRect(); }
+  function startMove(e) {
+    if (e.target === sigHandle) return;
+    mode = 'move'; const p = e.touches ? e.touches[0] : e;
+    sx = p.clientX; sy = p.clientY; bx = sigBox.offsetLeft; by = sigBox.offsetTop;
+    e.preventDefault();
+  }
+  function startResize(e) {
+    mode = 'resize'; const p = e.touches ? e.touches[0] : e;
+    sx = p.clientX; sy = p.clientY; bw = sigBox.offsetWidth; bh = sigBox.offsetHeight;
+    ar = bh / bw; e.preventDefault(); e.stopPropagation();
+  }
+  function onMove(e) {
+    if (!mode) return;
+    const p = e.touches ? e.touches[0] : e;
+    const b = bounds();
+    if (mode === 'move') {
+      let nx = bx + (p.clientX - sx), ny = by + (p.clientY - sy);
+      nx = Math.max(0, Math.min(b.width - sigBox.offsetWidth, nx));
+      ny = Math.max(0, Math.min(b.height - sigBox.offsetHeight, ny));
+      sigBox.style.left = nx + 'px'; sigBox.style.top = ny + 'px';
+    } else {
+      let nw = Math.max(40, bw + (p.clientX - sx));
+      nw = Math.min(nw, b.width - sigBox.offsetLeft);
+      sigBox.style.width = nw + 'px';
+      sigBox.style.height = (nw * ar) + 'px';
+    }
+    e.preventDefault();
+  }
+  function end() { mode = null; }
+  sigBox.addEventListener('mousedown', startMove);
+  sigHandle.addEventListener('mousedown', startResize);
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', end);
+  // arrow-key nudge
+  document.addEventListener('keydown', e => {
+    if (placeOverlay.style.display !== 'flex') return;
+    const step = e.shiftKey ? 10 : 1;
+    if (e.key === 'ArrowLeft') sigBox.style.left = (sigBox.offsetLeft - step) + 'px';
+    else if (e.key === 'ArrowRight') sigBox.style.left = (sigBox.offsetLeft + step) + 'px';
+    else if (e.key === 'ArrowUp') sigBox.style.top = (sigBox.offsetTop - step) + 'px';
+    else if (e.key === 'ArrowDown') sigBox.style.top = (sigBox.offsetTop + step) + 'px';
+    else return;
+    e.preventDefault();
+  });
+})();
+
+async function applySignature() {
+  if (!placeTarget || !signatureDataUrl) return;
+  placeApply.disabled = true;
+  setStatus('Applying signature…');
+  try {
+    await ensureLibs();
+    const f = fileById(placeTarget.fileId);
+    const doc = await PDFDocument.load(f.bytes, { ignoreEncryption: true });
+    const page = doc.getPages()[placeTarget.srcIndex];
+    const { width: pw, height: ph } = page.getSize();
+
+    // map the sig box (in displayed-image px) to PDF points
+    const imgRect = placePageImg.getBoundingClientRect();
+    const scaleX = pw / imgRect.width, scaleY = ph / imgRect.height;
+    const bx = sigBox.offsetLeft, by = sigBox.offsetTop;
+    const bw = sigBox.offsetWidth, bh = sigBox.offsetHeight;
+    const pdfX = bx * scaleX;
+    const pdfW = bw * scaleX;
+    const pdfH = bh * scaleY;
+    const pdfY = ph - (by * scaleY) - pdfH; // PDF origin is bottom-left
+
+    const pngBytes = dataUrlToBytes(signatureDataUrl);
+    const png = await doc.embedPng(pngBytes);
+    page.drawImage(png, { x: pdfX, y: pdfY, width: pdfW, height: pdfH });
+
+    const bytes = await doc.save();
+    f.bytes = bytes;
+    f.size = bytes.byteLength;
+    pages.forEach(p => { if (p.fileId === f.id && p.srcIndex === placeTarget.srcIndex) p.thumb = null; });
+    invalidateOutput();
+    setStatus('Signature added to ' + f.name + (f.pages > 1 ? ' (page ' + (placeTarget.srcIndex + 1) + ')' : '') + '.', 'ok');
+    closePlacement();
+    render();
+    renderThumbs();
+  } catch (e) {
+    console.error(e);
+    setStatus('Could not apply signature: ' + e.message, 'err');
+  }
+  placeApply.disabled = false;
+}
+
+/* ---------- Merge ---------- */
+function invalidateOutput() {
+  lastOutput = null;
+  readyPanel.style.display = 'none';
+}
+
+async function merge() {
+  mergeBtn.disabled = true;
+  setStatus('Merging…');
+  try {
+    await ensureLibs();
+    const out = await PDFDocument.create();
+    const docCache = {};
+    for (const p of pages) {
+      if (!docCache[p.fileId]) {
+        docCache[p.fileId] = await PDFDocument.load(fileById(p.fileId).bytes, { ignoreEncryption: true });
+      }
+      const [pg] = await out.copyPages(docCache[p.fileId], [p.srcIndex]);
+      out.addPage(pg);
+    }
+    const bytes = await out.save();
+    const name = (outName.value.trim() || 'combined').replace(/\.pdf$/i, '') + '.pdf';
+    lastOutput = { bytes, name };
+    readyName.textContent = name + ' · ' + out.getPageCount() + ' pages';
+    readyPanel.style.display = '';
+    setStatus('', '');
+    await downloadPdf(bytes, name);
+  } catch (e) {
+    setStatus('Merge failed: ' + e.message, 'err');
+  }
+  mergeBtn.disabled = pages.length < 1;
+}
+
+/* ---------- Tabs ---------- */
+function setMode(m) {
+  mode = m;
+  [['files',tabFiles],['pages',tabPages],['convert',tabConvert],['font',tabFont],['sign',tabSign],['view',tabView]].forEach(([k,btn]) => {
+    btn.classList.toggle('active', m === k);
+    btn.setAttribute('aria-selected', m === k);
+  });
+  tabHint.textContent =
+    m === 'files' ? 'Reorder whole documents — quick and simple.' :
+    m === 'pages' ? 'Fine-tune every page: drag pages anywhere, mix pages from different PDFs, or remove pages you don\u2019t want.' :
+    m === 'convert' ? 'Turn images, Word docs, and text files into PDFs. Converted files join the merge order automatically.' :
+    m === 'font' ? 'Pick a font, then restyle any loaded PDF in place. Re-import the file to undo.' :
+    m === 'sign' ? 'Draw or type your signature, save it, then place it anywhere on a page. Applied signatures are stamped into the file.' :
+    'Open any PDF just to read it, or preview the finished merged document below.';
+  const hideDrop = (m === 'convert' || m === 'font' || m === 'sign' || m === 'view');
+  dropzone.style.display = hideDrop ? 'none' : '';
+  convertZone.style.display = m === 'convert' ? '' : 'none';
+  outputBar.style.display = hideDrop ? 'none' : '';
+  fontControls.style.display = m === 'font' ? '' : 'none';
+  signControls.style.display = m === 'sign' ? '' : 'none';
+  render();
+  if (m === 'pages') renderThumbs();
+  if (m === 'sign' && signMode === 'draw' && !sigCtx) setTimeout(initSigCanvas, 0);
+}
+tabFiles.addEventListener('click', () => setMode('files'));
+tabPages.addEventListener('click', () => setMode('pages'));
+tabConvert.addEventListener('click', () => setMode('convert'));
+tabFont.addEventListener('click', () => setMode('font'));
+tabSign.addEventListener('click', () => setMode('sign'));
+tabView.addEventListener('click', () => setMode('view'));
+
+// Signature builder wiring
+signDrawTab.addEventListener('click', () => setSignMode('draw'));
+signTypeTab.addEventListener('click', () => setSignMode('type'));
+sigCanvas.addEventListener('mousedown', sigDown);
+sigCanvas.addEventListener('mousemove', sigMove);
+window.addEventListener('mouseup', sigUp);
+sigClear.addEventListener('click', () => { initSigCanvas(); sigHasInk = false; });
+sigTypeInput.addEventListener('input', renderSigFontPicker);
+sigSave.addEventListener('click', saveSignature);
+placeClose.addEventListener('click', closePlacement);
+placeApply.addEventListener('click', applySignature);
+
+/* ---------- Wiring ---------- */
+function wireZone(zone, input, handler) {
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  input.addEventListener('change', () => { handler(Array.from(input.files)); input.value = ''; });
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) handler(Array.from(e.dataTransfer.files));
+  });
+}
+wireZone(dropzone, fileInput, addFiles);
+wireZone(convertZone, convertInput, convertFiles);
+wireZone(openZone, openInput, arr => { if (arr[0]) openToView(arr[0]); });
+mergeBtn.addEventListener('click', merge);
+saveBtn.addEventListener('click', () => { if (lastOutput) downloadPdf(lastOutput.bytes, lastOutput.name); });
+previewBtn.addEventListener('click', () => { if (lastOutput) openPreview(lastOutput.bytes, lastOutput.name); });
+render();
+
+// PWA: register service worker so the app shell works offline and installs as a desktop/mobile app
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* offline support just won't be available */ });
+  });
+}
+</script>
+</body>
+</html>
