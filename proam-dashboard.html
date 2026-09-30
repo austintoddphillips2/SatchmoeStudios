@@ -23,6 +23,9 @@
   .proam-carousel-dots{display:flex;justify-content:center;gap:8px;padding:16px 0 4px;}
   .proam-dot{width:8px;height:8px;border-radius:50%;background:rgba(127,127,127,0.35);cursor:pointer;border:none;padding:0;transition:background .2s;}
   .proam-dot.active{background:#ff7a3d;}
+  .proam-carousel-controls{display:flex;align-items:center;justify-content:center;gap:18px;}
+  .proam-pause{background:transparent;border:1px solid currentColor;color:inherit;padding:7px 12px;font:inherit;cursor:pointer;}
+  @media(prefers-reduced-motion:reduce){.proam-slide{transition:none;}}
 </style>
 </head>
 <body>
@@ -84,12 +87,15 @@
       <button class="proam-carousel-nav proam-prev" type="button" aria-label="Previous screenshot">‹</button>
       <button class="proam-carousel-nav proam-next" type="button" aria-label="Next screenshot">›</button>
     </div>
-    <div class="proam-carousel-dots">
-      <button class="proam-dot active" type="button" data-i="0" aria-label="Slide 1"></button>
-      <button class="proam-dot" type="button" data-i="1" aria-label="Slide 2"></button>
-      <button class="proam-dot" type="button" data-i="2" aria-label="Slide 3"></button>
-      <button class="proam-dot" type="button" data-i="3" aria-label="Slide 4"></button>
-      <button class="proam-dot" type="button" data-i="4" aria-label="Slide 5"></button>
+    <div class="proam-carousel-controls">
+      <div class="proam-carousel-dots">
+        <button class="proam-dot active" type="button" data-i="0" aria-label="Slide 1"></button>
+        <button class="proam-dot" type="button" data-i="1" aria-label="Slide 2"></button>
+        <button class="proam-dot" type="button" data-i="2" aria-label="Slide 3"></button>
+        <button class="proam-dot" type="button" data-i="3" aria-label="Slide 4"></button>
+        <button class="proam-dot" type="button" data-i="4" aria-label="Slide 5"></button>
+      </div>
+      <button class="proam-pause" type="button" aria-label="Pause slideshow" aria-pressed="false">Pause</button>
     </div>
   </div>
 </section>
@@ -162,16 +168,22 @@
   var slides = document.querySelectorAll('.proam-slide');
   var dots = document.querySelectorAll('.proam-dot');
   var i = 0, timer;
+  var pause = document.querySelector('.proam-pause');
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var paused = !!reducedMotion;
+  function updatePause(){ pause.textContent = paused ? 'Play' : 'Pause'; pause.setAttribute('aria-label', paused ? 'Play slideshow' : 'Pause slideshow'); pause.setAttribute('aria-pressed', paused ? 'true' : 'false'); }
   function show(n){
     i = (n + slides.length) % slides.length;
     slides.forEach(function(s, idx){ s.classList.toggle('active', idx === i); });
     dots.forEach(function(d, idx){ d.classList.toggle('active', idx === i); });
   }
   function next(){ show(i + 1); }
-  function restart(){ clearInterval(timer); timer = setInterval(next, 4500); }
+  function restart(){ clearInterval(timer); if (!paused) timer = setInterval(next, 4500); }
   dots.forEach(function(d){ d.addEventListener('click', function(){ show(parseInt(d.dataset.i, 10)); restart(); }); });
   document.querySelector('.proam-prev').addEventListener('click', function(){ show(i - 1); restart(); });
   document.querySelector('.proam-next').addEventListener('click', function(){ show(i + 1); restart(); });
+  pause.addEventListener('click', function(){ paused = !paused; updatePause(); restart(); });
+  updatePause();
   restart();
 })();
 </script>
