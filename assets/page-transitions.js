@@ -1,4 +1,4 @@
-// A short curtain between normal document navigations; the header stays above it.
+// Full-screen logo swipe between normal document navigations.
 (function () {
   const root = document.documentElement;
   const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -11,7 +11,6 @@
     sessionStorage.removeItem(key);
   } catch (_) { /* Navigation works normally when storage is unavailable. */ }
   if (!motion.matches && pending && pending.path === location.pathname && Date.now() - pending.time < 8000) {
-    root.style.setProperty('--transition-header', `${pending.header}px`);
     root.classList.add('page-arriving');
     // A failed or interrupted load must never leave the curtain over the page.
     setTimeout(reset, 1600);
@@ -21,13 +20,14 @@
     navigating = false;
   }
   document.addEventListener('DOMContentLoaded', function () {
-    const header = document.querySelector('body > header');
-    if (header) root.style.setProperty('--transition-header', `${header.offsetHeight}px`);
     if (root.classList.contains('page-arriving')) {
-      requestAnimationFrame(() => requestAnimationFrame(() => {
+      const mobile = window.matchMedia('(max-width:760px)').matches;
+      // Hold the logo for a beat after the new document is ready, then reveal it.
+      setTimeout(() => {
+        if (!root.classList.contains('page-arriving')) return;
         root.classList.add('page-entering');
-        setTimeout(reset, 450);
-      }));
+        setTimeout(reset, mobile ? 240 : 300);
+      }, mobile ? 140 : 220);
     }
     document.addEventListener('click', function (event) {
       const link = event.target.closest('a[href]');
@@ -37,13 +37,13 @@
       if (navigating) { event.preventDefault(); return; }
       // Do not delay navigation unless the destination can recover its arrival state.
       try {
-        sessionStorage.setItem(key, JSON.stringify({ path: target.pathname, time: Date.now(), header: header?.offsetHeight || 0 }));
+        sessionStorage.setItem(key, JSON.stringify({ path: target.pathname, time: Date.now() }));
       } catch (_) { return; }
       event.preventDefault();
       navigating = true;
       root.classList.remove('page-arriving', 'page-entering');
       root.classList.add('page-departing');
-      const duration = window.matchMedia('(max-width:760px)').matches ? 120 : 180;
+      const duration = window.matchMedia('(max-width:760px)').matches ? 180 : 230;
       setTimeout(() => location.assign(target.href), duration);
       setTimeout(reset, 2000);
     });

@@ -575,18 +575,25 @@ a:focus-visible,button:focus-visible{outline:3px solid var(--orange);outline-off
   .viewer-stage img{max-height:calc(100dvh - 230px);}
 }
 
-/* Diagonal page curtain sits below the persistent-looking header. */
-html::after{
-  content:'';position:fixed;top:var(--transition-header,74px);bottom:0;
-  left:-35vw;width:170vw;z-index:49;pointer-events:none;
-  background:linear-gradient(to left,var(--blue) 0 12px,var(--teal) 12px 24px,#151729 24px calc(100% - 24px),var(--teal) calc(100% - 24px) calc(100% - 12px),var(--blue) calc(100% - 12px));
-  transform:translateX(-125%) skewX(-15deg);
+/* Full viewport logo swipe; both layers move together without skew or header gaps. */
+html::before,html::after{
+  content:'';position:fixed;inset:0;pointer-events:none;visibility:hidden;
+  transform:translateX(-100%);
 }
-html.page-departing::after{transform:translateX(0) skewX(-15deg);transition:transform 180ms cubic-bezier(.4,0,.2,1);pointer-events:auto;}
-html.page-arriving::after{transform:translateX(0) skewX(-15deg);pointer-events:auto;}
-html.page-arriving.page-entering::after{transform:translateX(125%) skewX(-15deg);transition:transform 180ms cubic-bezier(.4,0,.2,1);}
+html::after{z-index:1000;background:#151729;border-right:8px solid var(--teal);box-shadow:8px 0 0 var(--blue);}
+html::before{z-index:1001;background:url('/assets/logo-mark-transparent.png') center / 150px auto no-repeat;}
+html.page-departing::before,html.page-departing::after{
+  visibility:visible;transform:translateX(0);transition:transform 230ms cubic-bezier(.4,0,.2,1);
+}
+html.page-departing::after,html.page-arriving::after{pointer-events:auto;}
+html.page-arriving::before,html.page-arriving::after{visibility:visible;transform:translateX(0);}
+html.page-arriving.page-entering::before,html.page-arriving.page-entering::after{
+  transform:translateX(100%);transition:transform 260ms cubic-bezier(.4,0,.2,1);
+}
 @media(max-width:760px){
-  html::after{background:linear-gradient(to left,var(--blue) 0 6px,var(--teal) 6px 12px,#151729 12px calc(100% - 12px),var(--teal) calc(100% - 12px) calc(100% - 6px),var(--blue) calc(100% - 6px));}
-  html.page-departing::after,html.page-arriving.page-entering::after{transition-duration:120ms;}
+  html::before{background-size:110px auto;}
+  html::after{border-right-width:5px;box-shadow:5px 0 0 var(--blue);}
+  html.page-departing::before,html.page-departing::after{transition-duration:180ms;}
+  html.page-arriving.page-entering::before,html.page-arriving.page-entering::after{transition-duration:200ms;}
 }
-@media(prefers-reduced-motion:reduce){html::after{display:none;}}
+@media(prefers-reduced-motion:reduce){html::before,html::after{display:none;}}
