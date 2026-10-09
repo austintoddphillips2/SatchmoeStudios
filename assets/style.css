@@ -470,3 +470,20 @@ footer .fine{font-family:'Space Mono',monospace;font-size:12px;color:var(--text-
 }
 ::selection{background:var(--orange);color:var(--navy);}
 a:focus-visible,button:focus-visible{outline:3px solid var(--orange);outline-offset:2px;}
+
+/* Apple release screenshots retain their complete portrait composition. */
+.ios-release{background:var(--surface-alt);scroll-margin-top:100px;}
+.ios-release .section-head{max-width:800px;margin-bottom:40px;}
+.ios-release .section-head .tag-row{margin:24px 0;}
+.ios-gallery-heading{font-size:26px;line-height:1.15;margin-bottom:12px;}
+.ios-gallery-hint{color:var(--text-muted);font-size:14px;line-height:1.6;margin-bottom:22px;}
+.ios-gallery{display:flex;gap:22px;overflow-x:auto;scroll-snap-type:x proximity;padding:0 0 20px;}
+.ios-gallery:focus-visible{outline:3px solid var(--orange);outline-offset:4px;}
+.ios-shot{flex:0 0 240px;scroll-snap-align:start;}
+.ios-shot a{display:block;border:3px solid var(--chrome);background:#090d10;}
+.ios-shot img{width:100%;height:auto;}
+.ios-shot figcaption{font-size:14px;line-height:1.6;padding-top:14px;}
+.ios-shot strong,.ios-shot span{display:block;}
+.ios-shot span{color:var(--text-muted);margin-top:5px;}
+.affiliation-notice,.page-hero .affiliation-notice{font-size:14px;line-height:1.65;color:var(--text-muted);border-left:3px solid var(--orange);padding-left:16px;}
+@media(max-width:480px){.ios-shot{flex-basis:230px;}.ios-gallery{gap:18px;}}
