@@ -23,4 +23,4 @@ The Cabinet is hosted at `/thecabinet/`. Its complete static game, portraits, da
 
 The Cabinet keeps its existing GA4 property (`G-ENKKL3JF1H`).
 
-Project Romémon is featured on the homepage and described at `/romemon/` as a project in development. Proam Dashboard remains available at `/proam-dashboard/` and is listed under Other Projects.
+Red Eye Empire is featured on the homepage as a free-to-play idle airline tycoon coming to Steam in late 2026, with iOS to follow. Project Romémon is listed under Other Projects and described at `/romemon/` as a project in development. FarChunks, a planned Minecraft LOD mod, is also listed under Other Projects. Proam Dashboard remains available at `/proam-dashboard/` and is listed under Other Projects.
