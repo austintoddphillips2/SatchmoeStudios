@@ -473,6 +473,7 @@ a:focus-visible,button:focus-visible{outline:3px solid var(--orange);outline-off
 
 /* Apple release screenshots retain their complete portrait composition. */
 .ios-release{background:var(--surface-alt);scroll-margin-top:100px;}
+#red-eye-empire{scroll-margin-top:100px;}
 .ios-release .section-head{max-width:800px;margin-bottom:40px;}
 .ios-release .section-head .tag-row{margin:24px 0;}
 .ios-gallery-heading{font-size:26px;line-height:1.15;margin-bottom:12px;}
