@@ -6,6 +6,7 @@ The website is published at https://satchmoestudios.com/. Clean page routes use 
 
 - `/` (legacy source: `index.html`)
 - `/mma-empire/` (legacy source: `mma-empire.html`)
+- `/red-eye-empire/`
 - `/privacy/` (legacy source: `mma-empire-privacy.html`)
 - `/proam-dashboard/` (legacy source: `proam-dashboard.html`)
 - `/team/` (legacy source: `team.html`)
@@ -23,4 +24,4 @@ The Cabinet is hosted at `/thecabinet/`. Its complete static game, portraits, da
 
 The Cabinet keeps its existing GA4 property (`G-ENKKL3JF1H`).
 
-Red Eye Empire is featured on the homepage as a free-to-play idle airline tycoon coming to Steam in late 2026, with iOS to follow. Project Romémon is listed under Other Projects and described at `/romemon/` as a project in development. FarChunks, a planned Minecraft LOD mod, is also listed under Other Projects. Proam Dashboard remains available at `/proam-dashboard/` and is listed under Other Projects.
+Red Eye Empire has its own page at `/red-eye-empire/` and is also featured on the homepage. It is a free-to-play idle airline tycoon, with an LED departure board that sits on your desktop, coming to Steam in late 2026 and iOS to follow. Project Romémon is listed under Other Projects and described at `/romemon/` as a project in development. FarChunks, a planned Minecraft LOD mod, is also listed under Other Projects. Proam Dashboard remains available at `/proam-dashboard/` and is listed under Other Projects.

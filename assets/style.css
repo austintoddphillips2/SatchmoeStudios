@@ -409,11 +409,29 @@ section{padding:90px 0;}
   text-align:center;padding:0 16px;line-height:1.1;
 }
 @media(max-width:860px){.featured-visual{order:-1;}}
+.featured-visual.logo-art{
+  height:auto;
+  aspect-ratio:16/9;
+  background:#07080d;
+  background-image:none;
+}
+.featured-visual.logo-art img{object-fit:contain;background:#07080d;}
+
+/* Landscape product screenshots. Reuses .ios-shot so the screenshot viewer still opens them. */
+.shot-gallery{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:22px;
+}
+.shot-gallery .ios-shot{flex:none;min-width:0;}
+.shot-gallery .shot-span{grid-column:1/-1;}
+@media(max-width:700px){.shot-gallery{grid-template-columns:1fr;}}
 
 /* ===== HERO LOGO BANNER (product logo art at top of a page-hero) ===== */
 .banner-img{
   display:block;
   width:100%;
+  height:auto;
   max-width:640px;
   border:4px solid var(--chrome);
   box-shadow:8px 8px 0 var(--chrome);
