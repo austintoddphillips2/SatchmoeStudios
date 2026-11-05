@@ -416,6 +416,10 @@ section{padding:90px 0;}
   background-image:none;
 }
 .featured-visual.logo-art img{object-fit:contain;background:#07080d;}
+/* Canonical MMA Empire wordmark. mma_empire_wordmark_4x_upscale_711a.png is a 4x upscale of the 406x251 master, not extra detail. Keep the file aspect ratio. */
+.featured-visual.mma-wordmark{background:var(--navy);background-image:none;}
+.featured-visual.mma-wordmark img{object-fit:contain;object-position:center;background:var(--navy);}
+.banner-img.mma-wordmark{background:var(--navy);object-fit:contain;height:auto;}
 
 /* Landscape product screenshots. Reuses .ios-shot so the screenshot viewer still opens them. */
 .shot-gallery{
